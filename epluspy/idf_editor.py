@@ -1,9 +1,10 @@
 import os
 import sys
+sys.path.append('C:/EnergyPlusV9-4-0')
 import numpy as np
 from pyenergyplus.api import EnergyPlusAPI
 import json
-sys.path.append('C:/EnergyPlusV9-4-0')
+
 
 
 class IDF():
@@ -13,20 +14,21 @@ class IDF():
         self.output_path = output_path
         self.idd = self._read_idd()        
         self.idf_dic = self._create_dic()
-        # print(self.idf_nocomment)
         pass
     
     def run(self):
         self.api = EnergyPlusAPI()
         self.state = self.api.state_manager.new_state()
         self.api.runtime.run_energyplus(self.state , ['-d', self.output_path, '-w', self.epw_file, self.idf_file])
+        self.api.runtime.clear_callbacks()
         self.api.state_manager.reset_state(self.state)
         self.api.state_manager.delete_state(self.state)
 
     def _read_idf(self, com_mark = '!'):
+        # remove comment in the idf
         with open(self.idf_file, 'r') as f:
             self.ori_idf = f.read()
-        f.close()
+            f.close()
         idf_lines = self.ori_idf.splitlines()
         new_idf = []
         idf_comment = []
@@ -80,11 +82,12 @@ class IDF():
         idd_path = 'C:\\EnergyPlusV9-4-0\\Energy+.schema.epJSON'
         with open(idd_path, 'r') as f:
             idd = json.load(f)               
-        # f.close()
+            f.close()
         self.class_list = []
         self.class_list_upper = []
         key_name = list(idd['properties'].keys())
         for i in key_name:
+            # Convert idd properties to upper case
             self.class_list.append(i)
             self.class_list_upper.append(i.upper())
             idd['properties'][i.upper()] = idd['properties'].pop(i)
@@ -92,11 +95,18 @@ class IDF():
         return idd
 
     def add(self, class_type, class_name = None, field_data = None, **kwargs):
+        """
+        field_data: Two ways to add the class:
+                    1. If you prefer to specify all field data in the class, wirte them into a list. For null field, use empty string "" to occupy the field.
+                    2. If you prefer to specify according to filed name, specify them in kwargs, e.g. Design_Supply_Air_Flow_Rate = 50
+                    Note that the required field must be specified
+        """
+        class_type = class_type.upper()
         kw_list = []
         value_list = []
-        class_idd = self.idd['properties'][class_type.upper()]
+        class_idd = self.idd['properties'][class_type]
         field_name, _, field_default, field_required, field_datatype = self._get_idd_info(class_idd)
-        class_type = self.class_list[self.class_list_upper.index(class_type.upper())]        
+        class_type = self.class_list[self.class_list_upper.index(class_type)]        
         if 'name' in class_idd.keys():
             assert class_name is not None, "Please provide a NAME for the object, e.g. class_name = 'myClass' "
         if field_data == None:
@@ -106,8 +116,15 @@ class IDF():
             self._write_user_object_kw(class_type, field_name, field_default, kw_list, value_list, field_datatype)
         else:
             ck_req, miss_item = self._check_require(field_data, field_name, field_required)
-            assert ck_req, 'The required data (%s) is missed in field_data'.format(miss_item)
+            assert ck_req, f'The required data ({miss_item}) is missed in field_data'
+            assert len(field_name) == len(field_data), 'Please make sure all files are specified in the list, use empty string "" to occupy if the field data desired to be empty'
             self._write_user_object_list(class_type, field_name, field_data, field_datatype)
+
+    def delete_class(self, class_type, class_name, class_index, all = False):
+        pass
+
+    def get_info(self, class_type, class_name, class_index, field_name):
+        pass
 
     def _check_require(self, field_data, field_name, field_required):
         require_index = []
@@ -149,6 +166,8 @@ class IDF():
             field_name.append(field_name_i)
             if 'enum' in class_idd_properties[field_name_i].keys():
                 field_option.append(class_idd_properties[field_name_i]['enum'])
+            else:
+                field_option.append('')
             if 'default' in class_idd_properties[field_name_i].keys():
                 field_default.append(class_idd_properties[field_name_i]['default'])       
             else:
@@ -211,7 +230,11 @@ class IDF():
                 self._write_object(class_type, field_name, field_data[i], file_path, mode)
             mode = 'a'
 
-    def edit(self, class_type, class_name = '*', **kwargs):
+    def edit(self, class_type, class_name, **kwargs):
+        """
+        class_name: set it as 'All' if edit all class in this type, otherwise specify calss_name
+        **kwargs: write field name and value, e.g. Design_Supply_Air_Flow_Rate = 50
+        """
         class_type = class_type.upper()
         class_idd = self.idd['properties'][class_type]
         field_name, _, field_default, field_required, field_datatype = self._get_idd_info(class_idd)
@@ -222,15 +245,18 @@ class IDF():
             # To write: check value type
             key = key.lower()
             index = field_name.index(key)
-            if class_name == '*':
+            if class_name == 'All':
                 for i in range(len(field_data_list)):
                     self.idf_dic[class_type][i][index] = value
+                done = True
             else:
                 for i in range(len(field_data_list)):
                     if field_data_list[i][0] == class_name:
                         self.idf_dic[class_type][i][index] = value
+                        done = True
                     else:
                         continue
+        assert done == True, "Fail to find the class, please specify the corrct name"
 
     def options(self, class_type, att_name):
         pass
