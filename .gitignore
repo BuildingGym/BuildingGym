@@ -1,0 +1,8 @@
+ref/*
+test.py
+*pyc
+*.idf
+*.xlsx
+*.csv
+*.xls
+*.pdf
