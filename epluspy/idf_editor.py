@@ -119,11 +119,40 @@ class IDF():
             assert ck_req, f'The required data ({miss_item}) is missed in field_data'
             assert len(field_name) == len(field_data), 'Please make sure all files are specified in the list, use empty string "" to occupy if the field data desired to be empty'
             self._write_user_object_list(class_type, field_name, field_data, field_datatype)
+    
+    def _del(self, class_type, item, method):
+        class_type = class_type.upper()
+        field_data_list = self.idf_dic[class_type]
+        class_idd = self.idd['properties'][class_type]
+        field_name, _, _, _, _ = self._get_idd_info(class_idd)        
+        if method =='by_name':
+            for i in item:
+                assert 'name' in field_name, 'This class does not include name in the field, please delete by index'
+                field_data = np.array(field_data_list)
+                assert i in field_data[:,0], 'The name is not found in the field data'
+                index = int(np.where(i == field_data[:,0])[0])
+                field_data_list.pop(index)
+        if method == 'by_index':
+            item.sort(reverse = True)
+            assert item[0] <= len(field_data_list), f'Index ({item[0]}) out of length ({len(field_data_list)}) in class {class_type}'
+            for index in item:
+                field_data_list.pop(index)
 
-    def delete_class(self, class_type, class_name, class_index, all = False):
-        pass
+    def delete_class(self, class_type, class_name = None, class_index = None):
+        class_type = class_type.upper()
+        if class_name == None and class_index == None:
+            a = 1
+        assert class_name == None or class_index == None, 'Please either specify class_name or class_index'
+        if class_name is not None:
+            if type(class_name) is not list:
+                class_name = [class_name]
+                self._del(class_type, class_name, 'by_name')
+        if class_index is not None:
+            if type(class_index) is not list:
+                class_index = [class_index]
+                self._del(class_type, class_index, 'by_index')
 
-    def get_info(self, class_type, class_name, class_index, field_name):
+    def get_info(self, class_type, class_name, field_name, class_index = None):
         pass
 
     def _check_require(self, field_data, field_name, field_required):
@@ -218,6 +247,7 @@ class IDF():
             self.idf_dic[class_type] = field_data
         
     def write_idf_file(self, file_path = os.getcwd()):
+        print('\033[95m'+'===Writing idf file for output, please wait for a while.....===')
         mode = 'w'
         file_path = os.path.join(file_path,'output.idf')
         for class_type in self.idf_dic.keys():
@@ -229,10 +259,11 @@ class IDF():
             for i in range(len(field_data)):
                 self._write_object(class_type, field_name, field_data[i], file_path, mode)
             mode = 'a'
+        print('\033[95m'+'===Successfully output idf file!===')
 
     def edit(self, class_type, class_name, **kwargs):
         """
-        class_name: set it as 'All' if edit all class in this type, otherwise specify calss_name
+        class_name: set it as 'All' if edit all class in this type, otherwise specify calss_name. class_name = 'All', or class_name = 'Airloop-1'
         **kwargs: write field name and value, e.g. Design_Supply_Air_Flow_Rate = 50
         """
         class_type = class_type.upper()
