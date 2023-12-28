@@ -1,8 +1,10 @@
 ref/*
 test.py
+test
 *pyc
 *.idf
 *.xlsx
 *.csv
 *.xls
 *.pdf
+*.epw

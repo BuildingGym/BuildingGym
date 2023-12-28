@@ -4,25 +4,18 @@ sys.path.append('C:/EnergyPlusV9-4-0')
 import numpy as np
 from pyenergyplus.api import EnergyPlusAPI
 import json
-
+from datetime import datetime
 
 
 class IDF():
     def __init__(self, idf_file, epw_file, output_path) -> None:
         self.idf_file = idf_file
         self.epw_file = epw_file
+        if not os.path.exists(output_path):
+            os.mkdir(output_path)
         self.output_path = output_path
         self.idd = self._read_idd()        
         self.idf_dic = self._create_dic()
-        pass
-    
-    def run(self):
-        self.api = EnergyPlusAPI()
-        self.state = self.api.state_manager.new_state()
-        self.api.runtime.run_energyplus(self.state , ['-d', self.output_path, '-w', self.epw_file, self.idf_file])
-        self.api.runtime.clear_callbacks()
-        self.api.state_manager.reset_state(self.state)
-        self.api.state_manager.delete_state(self.state)
 
     def _read_idf(self, com_mark = '!'):
         # remove comment in the idf
@@ -157,6 +150,8 @@ class IDF():
 
     def _check_require(self, field_data, field_name, field_required):
         require_index = []
+        if field_required == None:
+            return True, None
         for i in field_required:
             require_index.append(field_name.index(i))
         for i in require_index:
@@ -244,10 +239,13 @@ class IDF():
         if class_type in self.idf_dic.keys():
             self.idf_dic[class_type].append(field_data)
         else:
-            self.idf_dic[class_type] = field_data
+            if class_type in self.idf_dic:
+                self.idf_dic[class_type] = field_data
+            else:
+                self.idf_dic[class_type] = [field_data]
         
     def write_idf_file(self, file_path = os.getcwd()):
-        print('\033[95m'+'===Writing idf file for output, please wait for a while.....===')
+        print('\033[95m'+'===Writing idf file for output, please wait for a while.....==='+'\033[0m')
         mode = 'w'
         file_path = os.path.join(file_path,'output.idf')
         for class_type in self.idf_dic.keys():
@@ -259,7 +257,7 @@ class IDF():
             for i in range(len(field_data)):
                 self._write_object(class_type, field_name, field_data[i], file_path, mode)
             mode = 'a'
-        print('\033[95m'+'===Successfully output idf file!===')
+        print('\033[95m'+'===Successfully output idf file!==='+'\033[0m')
 
     def edit(self, class_type, class_name, **kwargs):
         """
@@ -289,23 +287,20 @@ class IDF():
                         continue
         assert done == True, "Fail to find the class, please specify the corrct name"
 
+    def run_period(self, start_date, end_date):
+        """
+        start_date: datetime.date class or string with format "yyyy-mm-dd", e.g. 2018-01-01.
+        end_date: same as start date
+        """
+        self.start_date = start_date
+        self.end_date = end_date
+        if type(start_date) == str or type(start_date) == str:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        assert type(start_date) == type(datetime.strptime('1993-01-02', '%Y-%m-%d').date()), 'Please check the format of the start date'
+        assert type(end_date) == type(datetime.strptime('1995-10-23', '%Y-%m-%d').date()), 'Please check the format of the end date'
+        self.edit('RunPeriod', 'All', begin_month = start_date.month, Begin_day_of_month = start_date.day,
+                  end_month = end_date.month, end_day_of_month = end_date.day)
+        
     def options(self, class_type, att_name):
         pass
-
-
-
-
-# data['properties']['Schedule:Compact']['legacy_idd']['field_info']
-# data['properties']['Coil:Cooling:Water']['legacy_idd']['field_info']['water_inlet_node_name']
-# # check_item:
-# data['properties']['Fan:ConstantVolume']['patternProperties']['^.*\\S.*$']['properties']
-# # check option:
-# data['properties']['SurfaceConvectionAlgorithm:Inside']['patternProperties']['.*']['properties']['algorithm']['enum']
-# # check_require
-# data['properties']['Fan:ConstantVolume']['name']
-# data['properties']['Fan:ConstantVolume']['patternProperties']['^.*\\S.*$']['required']
-# # check_default:
-# data['properties']['SurfaceConvectionAlgorithm:Inside']['patternProperties']['.*']['properties']['algorithm']['default']
-# # check_max/min item num
-# data['properties']['SurfaceConvectionAlgorithm:Inside']['maxProperties']
-# data['properties']['Sizing:Zone']['min_fields']
