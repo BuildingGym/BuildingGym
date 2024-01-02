@@ -9,13 +9,29 @@ from datetime import datetime
 
 class IDF():
     def __init__(self, idf_file, epw_file, output_path) -> None:
+        """
+        For parametric simulation.
+        idf_file: The idf file path for energyplus model
+        epw_file: The epw weather file for simulation
+        output_path: The output folder path for output results
+        """
+        assert os.path.exists(output_path), f'{output_path} does not exist'
+        assert os.path.exists(idf_file), f'{idf_file} does not exist'
+        assert os.path.exists(epw_file), f'{epw_file} does not exist'
         self.idf_file = idf_file
         self.epw_file = epw_file
-        if not os.path.exists(output_path):
-            os.mkdir(output_path)
         self.output_path = output_path
         self.idd = self._read_idd()        
         self.idf_dic = self._create_dic()
+        self._update = 0
+
+    # def run(self):
+    #     self.api = EnergyPlusAPI()
+    #     self.state = self.api.state_manager.new_state()
+    #     self.api.runtime.run_energyplus(self.state , ['-d', self.output_path, '-w', self.epw_file, self.idf_file])
+    #     self.api.runtime.clear_callbacks()
+    #     self.api.state_manager.reset_state(self.state)
+    #     self.api.state_manager.delete_state(self.state)        
 
     def _read_idf(self, com_mark = '!'):
         # remove comment in the idf
@@ -89,11 +105,16 @@ class IDF():
 
     def add(self, class_type, class_name = None, field_data = None, **kwargs):
         """
-        field_data: Two ways to add the class:
-                    1. If you prefer to specify all field data in the class, wirte them into a list. For null field, use empty string "" to occupy the field.
-                    2. If you prefer to specify according to filed name, specify them in kwargs, e.g. Design_Supply_Air_Flow_Rate = 50
+        add fielde data to class
+        class_type: required
+        class_name: only required if there is name field in the class
+        field_data: list of all value in the class, or None
+        Two ways to add the class:
+                    1. If you prefer to specify all field data in the class, wirte them into a list to field_data. For null field, use empty string "" to occupy the field.
+                    2. If you prefer to specify according to filed name, specify them in kwargs, use '_' to replace space in the field name, e.g. Design_Supply_Air_Flow_Rate = 50
                     Note that the required field must be specified
         """
+        self._update = 1
         class_type = class_type.upper()
         kw_list = []
         value_list = []
@@ -114,6 +135,7 @@ class IDF():
             self._write_user_object_list(class_type, field_name, field_data, field_datatype)
     
     def _del(self, class_type, item, method):
+        self._update = 1
         class_type = class_type.upper()
         field_data_list = self.idf_dic[class_type]
         class_idd = self.idd['properties'][class_type]
@@ -132,6 +154,7 @@ class IDF():
                 field_data_list.pop(index)
 
     def delete_class(self, class_type, class_name = None, class_index = None):
+        self._update = 1
         class_type = class_type.upper()
         if class_name == None and class_index == None:
             a = 1
@@ -208,15 +231,10 @@ class IDF():
         for i in range(len(kw_list)):
             index = field_name.index(kw_list[i].lower().replace(' ', '_'))
             field_data[index] = value_list[i]
-        # output = self._write_object(class_type, field_name, field_data)
         self._to_dic(class_type, field_data, field_datatype)
-
-        # return output
 
     def _write_user_object_list(self, class_type, field_name, field_data, field_datatype):
-        # output = self._write_object(class_type, field_name, field_data)
         self._to_dic(class_type, field_data, field_datatype)
-        # return output
     
     def _write_object(self, class_type, field_name, field_data, file_path, mode = 'a'):
         while len(field_name) < len(field_data):
@@ -258,12 +276,14 @@ class IDF():
                 self._write_object(class_type, field_name, field_data[i], file_path, mode)
             mode = 'a'
         print('\033[95m'+'===Successfully output idf file!==='+'\033[0m')
+        self._update = 0
 
     def edit(self, class_type, class_name, **kwargs):
         """
         class_name: set it as 'All' if edit all class in this type, otherwise specify calss_name. class_name = 'All', or class_name = 'Airloop-1'
-        **kwargs: write field name and value, e.g. Design_Supply_Air_Flow_Rate = 50
+        **kwargs: write field name and value. use "_" to replace space in the field name, e.g. Design_Supply_Air_Flow_Rate = 50
         """
+        self._update = 1
         class_type = class_type.upper()
         class_idd = self.idd['properties'][class_type]
         field_name, _, field_default, field_required, field_datatype = self._get_idd_info(class_idd)
@@ -278,6 +298,10 @@ class IDF():
                 for i in range(len(field_data_list)):
                     self.idf_dic[class_type][i][index] = value
                 done = True
+            elif type(class_name) == type(int(8)):
+                    assert class_name<= len(field_data_list), f'Index of {class_name} out of range, please check the index'
+                    self.idf_dic[class_type][class_name][index] = value
+                    done = True                
             else:
                 for i in range(len(field_data_list)):
                     if field_data_list[i][0] == class_name:
