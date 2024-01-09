@@ -7,9 +7,10 @@ from epluspy.idf_editor import IDF
 from datetime import datetime
 import pandas as pd
 import re
+from pathlib import Path
 
 class IDF_simu(IDF):
-    def __init__(self, idf_file, epw_file, output_path, start_date, end_date) -> None:
+    def __init__(self, idf_file, epw_file, output_path, start_date, end_date, n_time_step, sensing = False) -> None:
         """
         idf_file: The idf file path for energyplus model
         epw_file: The epw weather file for simulation
@@ -20,33 +21,50 @@ class IDF_simu(IDF):
         assert os.path.exists(output_path), f'{output_path} does not exist'
         assert os.path.exists(idf_file), f'{idf_file} does not exist'
         assert os.path.exists(epw_file), f'{epw_file} does not exist'
+        self.sensor_def = False
         self.start_date = start_date
         self.end_date = end_date
-        if type(start_date) == str or type(start_date) == str:
-            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
-        assert type(start_date) == type(datetime.strptime('1993-01-02', '%Y-%m-%d').date()), 'Please check the format of the start date'
-        assert type(end_date) == type(datetime.strptime('1995-10-23', '%Y-%m-%d').date()), 'Please check the format of the end date'
+        self.n_time_step = n_time_step
+        self.set_time_step(n_time_step)
+        self.sensing = sensing
+        self.sensor_index = 0
+        if self.sensing:
+            self.sensor_dic = {}
+        if type(self.start_date) == str or type(self.start_date) == str:
+            self.start_date = datetime.strptime(self.start_date, '%Y-%m-%d').date()
+            self.end_date = datetime.strptime(self.end_date, '%Y-%m-%d').date()
+        assert type(self.start_date) == type(datetime.strptime('1993-01-02', '%Y-%m-%d').date()), 'Please check the format of the start date'
+        assert type(self.end_date) == type(datetime.strptime('1995-10-23', '%Y-%m-%d').date()), 'Please check the format of the end date'
+        self.n_days = (self.end_date - self.start_date).days
+        self.total_step = (self.n_days + 1) * 24 * n_time_step
         self._dry_run()
         self._get_edd()
         self._get_rdd()
         self._get_sensor_list()
 
     def run(self):
+        if self.sensing:
+            assert self.sensor_def, 'Please make sure you have correcttly define the sensor using sensor()'        
         self.run_period(self.start_date, self.end_date)
         if self._update == 1 or not os.path.exists(os.path.join(self.output_path, 'output.idf')):
-            print('\033[95m'+'Save the latest modle first, please wait for a while ....'+'\033[0m')
+            print('\033[95m'+'Save the latest model first, please wait for a while ....'+'\033[0m')
             self.write_idf_file(self.output_path)
         ep_file_path = os.path.join(self.output_path, 'EP_file')
         if not os.path.exists(ep_file_path):
             os.mkdir(ep_file_path)
         self.api = EnergyPlusAPI()
         self.state = self.api.state_manager.new_state()
+        if self.sensing == True:
+            self.api.runtime.callback_end_zone_timestep_before_zone_reporting(self.state, self._sensing)
         self.api.runtime.run_energyplus(self.state , ['-d', ep_file_path, '-w', self.epw_file,
                                                       os.path.join(self.output_path, 'output.idf')])
         self.api.runtime.clear_callbacks()
         self.api.state_manager.reset_state(self.state)
         self.api.state_manager.delete_state(self.state)
+        self.sensor_dic = self.sensor_dic[-int(self.total_step):]
+        ts = pd.date_range(self.start_date, self.end_date + pd.Timedelta(days = 1), freq = str(int(60/self.n_time_step))+'min')[1:]
+        self.sensor_dic.insert(0, 'Time', ts)
+        self.run_complete = 1
     
     def _dry_run(self):
         print('\033[95m'+'Perform a short-term dry run to get rdd and idd infomation....'+'\033[0m')
@@ -80,7 +98,7 @@ class IDF_simu(IDF):
         Get the information of rdd file
         '''
         rdd_file = os.path.join(self.output_path, '_dry run', 'eplusout.rdd')
-        assert os.path.exists(rdd_file), 'rdd file does not exist, please check'
+        assert os.path.exists(rdd_file), '.rdd file does not exist, please check'
         file1 = open(rdd_file, 'r')
         rdd_info = file1.readlines()[2:]
         file1.close()
@@ -101,7 +119,7 @@ class IDF_simu(IDF):
         Get the information of edd file
         """
         edd_file = os.path.join(self.output_path, '_dry run', 'eplusout.edd')
-        assert os.path.exists(edd_file), 'edd file does not exist, please check'
+        assert os.path.exists(edd_file), '.edd file does not exist, please check'
         file1 = open(edd_file, 'r')
         Lines = file1.readlines()
         file1.close()
@@ -132,9 +150,73 @@ class IDF_simu(IDF):
                 continue
 
         self.sensor_list = pd.DataFrame({'sensor_name': sensor_name_list, 'sensor_type': sensor_type_list})
+    
+    def sensor_call(self, **kwargs):
+        """
+        sensor_key_name = sensor_value_name
+        """
+        self.sensor_key_list = []
+        self.sensor_value_list = []
+        for key, value in kwargs.items():
+            key = key.replace('_', ' ')
+            self._check_sensor(key, value)
+            self.sensor_key_list.append(key)
+            self.sensor_value_list.append(value)
+        self.sensor_def = True
+        
+    def _sensing(self, state):
+        sensor_dic_i = {}
+        wp_flag = self.api.exchange.warmup_flag(state)
+        if not self.api.exchange.api_data_fully_ready(state):
+            return None
+        if wp_flag == 0:
+            for i in range(len(self.sensor_key_list)):
+                key = self.sensor_key_list[i]
+                value = self.sensor_value_list[i]
+                if type(value) is not list:
+                    value = [value]
+                for value_i in value:
+                    self.sensor_i = self.api.exchange.get_variable_handle(
+                        state, key, value_i
+                        )
+                    # assert self.sensor_i != -1, "Fail to call sensor, please check"
+                    self.sensor_data = self.api.exchange.get_variable_value(state, self.sensor_i)
+                    sensor_dic_i[key+'@'+value_i] = [self.sensor_data]
+            sensor_dic_i = pd.DataFrame(sensor_dic_i, index = [self.sensor_index])
+            if self.sensor_index == 0:
+                self.sensor_dic = sensor_dic_i
+            else:
+                self.sensor_dic = pd.concat([self.sensor_dic, sensor_dic_i])
+            self.sensor_index+=1
 
-    def sensor(self, **kwargs):
-        pass
+    def _check_sensor(self, key, value):
+        # to check
+        key = key.replace('_', ' ')
+        val = key in self.rdd_df['Sensor'].values
+        if not val:
+            self.add('output:variable', variable_name = key, reporting_frequency = 'Timestep')
+        j = np.where(self.sensor_list['sensor_type'] == key)[0]
+        condi = []
+        if type(value) == str:
+            value = [value]
+        for value_i in value:
+            for i in j:
+                if value_i == self.sensor_list['sensor_name'][i]:
+                    condi .append(True)
+                    break
+        assert sum(condi) == len(value), 'Please make sure the sensor name is correct'
+
+    def save(self, path = None):
+        assert self.run_complete == 1, 'Please make sure the model ran successfully before saving results'
+        if path == None:
+            self.sensor_dic.to_excel(os.path.join(self.output_path, 'sensor_data.xlsx'))
+        else:
+            if path[-5:] == '.xlsx' or path[-4:] == '.xls':
+                assert os.path.exists(Path(path).parent), "Path does not exists, please check"
+                self.sensor_dic.to_excel(path)
+            else:
+                assert os.path.exists(path), "Path does not exists, please check"
+                self.sensor_dic.to_excel(os.path.join(path, 'sensor_data.xlsx'))
 
     def actuator(self, **kwargs):
-        pass
+        pass            

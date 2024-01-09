@@ -316,15 +316,29 @@ class IDF():
         start_date: datetime.date class or string with format "yyyy-mm-dd", e.g. 2018-01-01.
         end_date: same as start date
         """
-        self.start_date = start_date
-        self.end_date = end_date
+        self._update = 1
         if type(start_date) == str or type(start_date) == str:
             start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
             end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
         assert type(start_date) == type(datetime.strptime('1993-01-02', '%Y-%m-%d').date()), 'Please check the format of the start date'
         assert type(end_date) == type(datetime.strptime('1995-10-23', '%Y-%m-%d').date()), 'Please check the format of the end date'
-        self.edit('RunPeriod', 'All', begin_month = start_date.month, Begin_day_of_month = start_date.day,
-                  end_month = end_date.month, end_day_of_month = end_date.day)
+        self.edit('RunPeriod', 'All',
+                  begin_year = start_date.year,
+                  begin_month = start_date.month,
+                  Begin_day_of_month = start_date.day,
+                  end_year = end_date.year,
+                  end_month = end_date.month,
+                  end_day_of_month = end_date.day)
         
+    def set_time_step(self, n):
+        """
+        n: number of time steps in one hour
+        """
+        if 'timestep'.upper() in self.idf_dic:
+            assert 60 % n == 0, 'Please make sure n is evenly divisible into 60'
+            self.edit('timestep', 'All', number_of_timesteps_per_hour = n)
+        else:
+            self.add('timestep', [n])
+                
     def options(self, class_type, att_name):
         pass
