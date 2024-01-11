@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 
 class IDF_simu(IDF):
-    def __init__(self, idf_file, epw_file, output_path, start_date, end_date, n_time_step, sensing = False) -> None:
+    def __init__(self, idf_file, epw_file, output_path, start_date, end_date, n_time_step, sensing = False, control = False) -> None:
         """
         idf_file: The idf file path for energyplus model
         epw_file: The epw weather file for simulation
@@ -22,19 +22,25 @@ class IDF_simu(IDF):
         assert os.path.exists(idf_file), f'{idf_file} does not exist'
         assert os.path.exists(epw_file), f'{epw_file} does not exist'
         self.sensor_def = False
+        self.actuator_def = False
         self.start_date = start_date
         self.end_date = end_date
         self.n_time_step = n_time_step
         self.set_time_step(n_time_step)
         self.sensing = sensing
+        self.control = control
         self.sensor_index = 0
+        self.cmd_index = 0
         if self.sensing:
             self.sensor_dic = {}
+        if self.control:
+            self.cmd_dic = {}            
         if type(self.start_date) == str or type(self.start_date) == str:
             self.start_date = datetime.strptime(self.start_date, '%Y-%m-%d').date()
             self.end_date = datetime.strptime(self.end_date, '%Y-%m-%d').date()
         assert type(self.start_date) == type(datetime.strptime('1993-01-02', '%Y-%m-%d').date()), 'Please check the format of the start date'
         assert type(self.end_date) == type(datetime.strptime('1995-10-23', '%Y-%m-%d').date()), 'Please check the format of the end date'
+        self.ts = pd.date_range(self.start_date, self.end_date + pd.Timedelta(days = 1), freq = str(int(60/self.n_time_step))+'min')[1:]
         self.n_days = (self.end_date - self.start_date).days
         self.total_step = (self.n_days + 1) * 24 * n_time_step
         self._dry_run()
@@ -44,7 +50,9 @@ class IDF_simu(IDF):
 
     def run(self):
         if self.sensing:
-            assert self.sensor_def, 'Please make sure you have correcttly define the sensor using sensor()'        
+            assert self.sensor_def, 'Please make sure you have correcttly define the sensor using sensor_call()'        
+        if self.control:
+            assert self.actuator_def, 'Please make sure you have correcttly define the actuator using actuator_call()'              
         self.run_period(self.start_date, self.end_date)
         if self._update == 1 or not os.path.exists(os.path.join(self.output_path, 'output.idf')):
             print('\033[95m'+'Save the latest model first, please wait for a while ....'+'\033[0m')
@@ -54,16 +62,19 @@ class IDF_simu(IDF):
             os.mkdir(ep_file_path)
         self.api = EnergyPlusAPI()
         self.state = self.api.state_manager.new_state()
-        if self.sensing == True:
+        if self.sensing == True and self.control == False:
             self.api.runtime.callback_end_zone_timestep_before_zone_reporting(self.state, self._sensing)
+        if self.sensing == False and self.control == True:
+            self.api.runtime.callback_end_zone_timestep_before_zone_reporting(self.state, self._control)
+        if self.sensing == True and self.control == True:
+            self.api.runtime.callback_end_zone_timestep_before_zone_reporting(self.state, self._sensing_ctrl)                        
         self.api.runtime.run_energyplus(self.state , ['-d', ep_file_path, '-w', self.epw_file,
                                                       os.path.join(self.output_path, 'output.idf')])
         self.api.runtime.clear_callbacks()
         self.api.state_manager.reset_state(self.state)
         self.api.state_manager.delete_state(self.state)
         self.sensor_dic = self.sensor_dic[-int(self.total_step):]
-        ts = pd.date_range(self.start_date, self.end_date + pd.Timedelta(days = 1), freq = str(int(60/self.n_time_step))+'min')[1:]
-        self.sensor_dic.insert(0, 'Time', ts)
+        self.sensor_dic.insert(0, 'Time', self.ts)
         self.run_complete = 1
     
     def _dry_run(self):
@@ -126,16 +137,16 @@ class IDF_simu(IDF):
         edd_info = [s for s in Lines if "EnergyManagementSystem:Actuator Available," in s]
         component_name = []
         component_type = []
-        control_variable =[]
+        control_type =[]
         unit = []
         for i in edd_info:
             j = re.split(',|\[ |\]', i)
             component_name.append(j[1].strip()) # e.g. VAV_1 Supply Equipment Outlet Node
             component_type.append(j[2].strip()) # e.g. System Node Setpoint
-            control_variable.append(j[3].strip()) # e.g. Temperature Setpoint
+            control_type.append(j[3].strip()) # e.g. Temperature Setpoint
             unit.append(j[5].strip())
         self.edd_df = pd.DataFrame({'Component_name':component_name, 'Component_type':component_type,
-                                    'Control_variable':control_variable, 'Unit':unit})
+                                    'Control_type':control_type, 'Unit':unit})
     
     def _get_sensor_list(self):
         dry_run_results = pd.read_csv(os.path.join(self.dry_run_path, 'eplusout.csv'), nrows = 6)
@@ -148,13 +159,15 @@ class IDF_simu(IDF):
                 sensor_type_list.append('['.join(i[-1].split('[')[0:-1]).strip())
             else:
                 continue
-
         self.sensor_list = pd.DataFrame({'sensor_name': sensor_name_list, 'sensor_type': sensor_type_list})
     
     def sensor_call(self, **kwargs):
         """
         sensor_key_name = sensor_value_name
         """
+        if not self.sensing:
+            print('\033[93mWARNING: you call the sensor but not activate the sensing function.\
+                  Set self.sensing as True if you want to sense during simulation\033[93m')
         self.sensor_key_list = []
         self.sensor_value_list = []
         for key, value in kwargs.items():
@@ -165,6 +178,7 @@ class IDF_simu(IDF):
         self.sensor_def = True
         
     def _sensing(self, state):
+        assert self.sensing, 'Please initialize sensing as "True" in IDF_simu Class if you would like to call sensor during simulation'
         sensor_dic_i = {}
         wp_flag = self.api.exchange.warmup_flag(state)
         if not self.api.exchange.api_data_fully_ready(state):
@@ -188,6 +202,60 @@ class IDF_simu(IDF):
             else:
                 self.sensor_dic = pd.concat([self.sensor_dic, sensor_dic_i])
             self.sensor_index+=1
+            return sensor_dic_i
+
+    def actuator_call(self, **kwargs):
+        """
+        Control type = [Component Unique Name, Component Type]
+        """
+        if not self.control:
+            print('\033[93mWARNING: you call the actuator but not activate the control function.\
+                  Set self.control as True if you want to control using actuator\033[93m')
+        self.control_type_list = []
+        self.component_name_list = []
+        self.component_type_list = []
+        for key, value in kwargs.items():
+            key = key.replace('__', '/')
+            key = key.replace('_', ' ')
+            self._check_actuator(key, value)
+            if len(np.array(value).shape) == 1:
+                value = [value]
+            for value_i in value:
+                self.control_type_list.append(key)
+                self.component_name_list.append(value_i[0])
+                self.component_type_list.append(value_i[1])
+        self.actuator_def = True
+
+    def _control(self, state):
+        cmd_dic_i = {}
+        assert self.control, 'Please initialize control as "True" in IDF_simu Class if you would like to call sensor during simulation'
+        assert 'control_fun' in dir(self), "please define the control function as control_fun()"
+        wp_flag = self.api.exchange.warmup_flag(state)
+        if not self.api.exchange.api_data_fully_ready(state):
+            return None
+        if wp_flag == 0:        
+            com = self.control_fun(self.sensor_t)
+            assert type(com) == list, 'The output of the control_fun() should be list'
+            assert len(com) == len(self.component_type_list), 'The length of command and the number of actuator should be same'
+            for i in range(len(self.component_type_list)):
+                self.actuator_id = self.api.exchange.get_actuator_handle(
+                    state,
+                    self.component_type_list[i],
+                    self.control_type_list[i],
+                    self.component_name_list[i]
+                    ) # component_type, control_type, actuator_key
+                self.api.exchange.set_actuator_value(state , self.actuator_id, com[i])
+                cmd_dic_i[self.component_type_list[i]+'@'+self.control_type_list[i]+'@'+self.component_name_list[i]] = [com[i]]
+            cmd_dic_i = pd.DataFrame(cmd_dic_i, index = [self.cmd_index])
+            if self.cmd_index == 0:
+                self.cmd_dic = cmd_dic_i
+            else:
+                self.cmd_dic = pd.concat([self.cmd_dic, cmd_dic_i])
+            self.cmd_index+=1                
+
+    def _sensing_ctrl(self, state):
+        self.sensor_t = self._sensing(state) # sensor_t: the simulation results at timestep t
+        self._control(state)
 
     def _check_sensor(self, key, value):
         # to check
@@ -202,14 +270,29 @@ class IDF_simu(IDF):
         for value_i in value:
             for i in j:
                 if value_i == self.sensor_list['sensor_name'][i]:
-                    condi .append(True)
+                    condi.append(True)
                     break
         assert sum(condi) == len(value), 'Please make sure the sensor name is correct'
+
+    def _check_actuator(self, key, value):
+        key = key.replace('__', '/')
+        key = key.replace('_', ' ')
+        val = key in self.edd_df['Control_type'].values
+        assert val, f'{key} not found in edd file, please check'
+        j = np.where(self.edd_df['Control_type'] == key)[0]
+        condi = []
+        for value_i in value:
+            for i in j:
+                if value_i[0] == self.edd_df['Component_name'][i] and value_i[1] == self.edd_df['Component_type'][i]:
+                    condi.append(True)
+                    break
+        assert sum(condi) == len(value), 'Please make sure the actuator name (control type, component name, component type) is correct'
 
     def save(self, path = None):
         assert self.run_complete == 1, 'Please make sure the model ran successfully before saving results'
         if path == None:
             self.sensor_dic.to_excel(os.path.join(self.output_path, 'sensor_data.xlsx'))
+            self.cmd_dic.to_excel(os.path.join(self.output_path, 'cmd_data.xlsx'))
         else:
             if path[-5:] == '.xlsx' or path[-4:] == '.xls':
                 assert os.path.exists(Path(path).parent), "Path does not exists, please check"
@@ -217,6 +300,4 @@ class IDF_simu(IDF):
             else:
                 assert os.path.exists(path), "Path does not exists, please check"
                 self.sensor_dic.to_excel(os.path.join(path, 'sensor_data.xlsx'))
-
-    def actuator(self, **kwargs):
-        pass            
+                self.cmd_dic.to_excel(os.path.join(path, 'cmd_data.xlsx'))
