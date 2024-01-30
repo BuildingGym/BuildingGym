@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 
 class IDF_simu(IDF):
-    def __init__(self, idf_file, epw_file, output_path, start_date, end_date, n_time_step, sensing = False, control = False) -> None:
+    def __init__(self, idf_file, epw_file, output_path, start_date, end_date, n_time_step, sensing = False, control = False, runtime_id = 0) -> None:
         """
         idf_file: The idf file path for energyplus model
         epw_file: The epw weather file for simulation
@@ -31,6 +31,7 @@ class IDF_simu(IDF):
         self.control = control
         self.sensor_index = 0
         self.cmd_index = 0
+        self.runtime_id = runtime_id
         if self.sensing:
             self.sensor_dic = {}
         if self.control:
@@ -56,25 +57,59 @@ class IDF_simu(IDF):
         self.run_period(self.start_date, self.end_date)
         if self._update == 1 or not os.path.exists(os.path.join(self.output_path, 'output.idf')):
             print('\033[95m'+'Save the latest model first, please wait for a while ....'+'\033[0m')
-            self.write_idf_file(self.output_path)
+        self.write_idf_file(self.output_path) # To add version id
         ep_file_path = os.path.join(self.output_path, 'EP_file')
         if not os.path.exists(ep_file_path):
             os.mkdir(ep_file_path)
         self.api = EnergyPlusAPI()
         self.state = self.api.state_manager.new_state()
         if self.sensing == True and self.control == False:
-            self.api.runtime.callback_end_zone_timestep_before_zone_reporting(self.state, self._sensing)
+            # self.api.runtime.callback_end_zone_timestep_before_zone_reporting(self.state, self._sensing)
+            if self.runtime_id == 0:
+                self.api.runtime.callback_message(self.state, self._sensing)
+            if self.runtime_id == 1:
+                self.api.runtime.callback_inside_system_iteration_loop(self.state, self._sensing)
+            if self.runtime_id == 2:
+                self.api.runtime.callback_end_zone_timestep_before_zone_reporting(self.state, self._sensing)
+            if self.runtime_id == 3:
+                self.api.runtime.callback_end_zone_timestep_after_zone_reporting(self.state, self._sensing)
+            if self.runtime_id == 4:
+                self.api.runtime.callback_end_zone_sizing(self.state, self._sensing)
+            if self.runtime_id == 5:
+                self.api.runtime.callback_end_system_timestep_before_hvac_reporting(self.state, self._sensing)
+            if self.runtime_id == 6:
+                self.api.runtime.callback_end_system_timestep_after_hvac_reporting(self.state, self._sensing)
+            if self.runtime_id == 7:
+                self.api.runtime.callback_end_system_sizing(self.state, self._sensing)
+            if self.runtime_id == 8:
+                self.api.runtime.callback_begin_zone_timestep_before_init_heat_balance(self.state, self._sensing)
+            if self.runtime_id == 9:
+                self.api.runtime.callback_begin_zone_timestep_after_init_heat_balance(self.state, self._sensing)
+            if self.runtime_id == 10:
+                self.api.runtime.callback_begin_system_timestep_before_predictor(self.state, self._sensing)      
+            if self.runtime_id == 11:
+                self.api.runtime.callback_begin_new_environment(self.state, self._sensing)      
+            if self.runtime_id == 12:
+                self.api.runtime.callback_after_predictor_before_hvac_managers(self.state, self._sensing)      
+            if self.runtime_id == 13:
+                self.api.runtime.callback_after_predictor_after_hvac_managers(self.state, self._sensing)      
+            if self.runtime_id == 14:
+                self.api.runtime.callback_after_new_environment_warmup_complete(self.state, self._sensing)      
+            if self.runtime_id == 15:
+                self.api.runtime.callback_after_component_get_input(self.state, self._sensing)                                                                                                                                                                                                                                                
         if self.sensing == False and self.control == True:
             self.api.runtime.callback_end_zone_timestep_before_zone_reporting(self.state, self._control)
         if self.sensing == True and self.control == True:
-            self.api.runtime.callback_end_zone_timestep_before_zone_reporting(self.state, self._sensing_ctrl)                        
+            self.api.runtime.callback_end_zone_timestep_before_zone_reporting(self.state, self._sensing_ctrl)      
+        self.api.exchange.request_variable(self.state , "Chiller Electricity Energy", "CHILLER")                  
         self.api.runtime.run_energyplus(self.state , ['-d', ep_file_path, '-w', self.epw_file,
                                                       os.path.join(self.output_path, 'output.idf')])
         self.api.runtime.clear_callbacks()
         self.api.state_manager.reset_state(self.state)
         self.api.state_manager.delete_state(self.state)
-        self.sensor_dic = self.sensor_dic[-int(self.total_step):]
-        self.sensor_dic.insert(0, 'Time', self.ts)
+        if len(self.sensor_dic) >= self.total_step:
+            self.sensor_dic = self.sensor_dic[-int(self.total_step):]
+            self.sensor_dic.insert(0, 'Time', self.ts)
         self.run_complete = 1
     
     def _dry_run(self):
@@ -147,6 +182,7 @@ class IDF_simu(IDF):
             unit.append(j[5].strip())
         self.edd_df = pd.DataFrame({'Component_name':component_name, 'Component_type':component_type,
                                     'Control_type':control_type, 'Unit':unit})
+        self.edd_df.to_csv(os.path.join(self.output_path, '_dry run','edd.csv'))
     
     def _get_sensor_list(self):
         dry_run_results = pd.read_csv(os.path.join(self.dry_run_path, 'eplusout.csv'), nrows = 6)
@@ -160,6 +196,7 @@ class IDF_simu(IDF):
             else:
                 continue
         self.sensor_list = pd.DataFrame({'sensor_name': sensor_name_list, 'sensor_type': sensor_type_list})
+        self.sensor_list.to_csv(os.path.join(self.output_path, '_dry run','rdd.csv'))
     
     def sensor_call(self, **kwargs):
         """
@@ -167,7 +204,7 @@ class IDF_simu(IDF):
         """
         if not self.sensing:
             print('\033[93mWARNING: you call the sensor but not activate the sensing function.\
-                  Set self.sensing as True if you want to sense during simulation\033[93m')
+                  Set self.sensing as True if you want to sense during simulation\033[00m')
         self.sensor_key_list = []
         self.sensor_value_list = []
         for key, value in kwargs.items():
@@ -183,13 +220,18 @@ class IDF_simu(IDF):
         wp_flag = self.api.exchange.warmup_flag(state)
         if not self.api.exchange.api_data_fully_ready(state):
             return None
-        if wp_flag == 0:
+        if not wp_flag:
+            sensor_dic_i['year'] = self.api.exchange.year(state)
+            sensor_dic_i['Month'] = self.api.exchange.month(state)
+            sensor_dic_i['Day'] = self.api.exchange.day_of_month(state)
+            sensor_dic_i['hour'] = self.api.exchange.hour(state)
+            sensor_dic_i['min'] = self.api.exchange.minutes(state)
             for i in range(len(self.sensor_key_list)):
                 key = self.sensor_key_list[i]
                 value = self.sensor_value_list[i]
                 if type(value) is not list:
                     value = [value]
-                for value_i in value:
+                for value_i in value:                           
                     self.sensor_i = self.api.exchange.get_variable_handle(
                         state, key, value_i
                         )
@@ -202,15 +244,15 @@ class IDF_simu(IDF):
             else:
                 self.sensor_dic = pd.concat([self.sensor_dic, sensor_dic_i])
             self.sensor_index+=1
-            return sensor_dic_i
+            self.sensor_t = sensor_dic_i
 
     def actuator_call(self, **kwargs):
         """
         Control type = [Component Unique Name, Component Type]
         """
         if not self.control:
-            print('\033[93mWARNING: you call the actuator but not activate the control function.\
-                  Set self.control as True if you want to control using actuator\033[93m')
+            print('\033[40m' + 'WARNING: you call the actuator but not activate the control function.\
+                  Set self.control as True if you want to control using actuator' + '\033[00m')
         self.control_type_list = []
         self.component_name_list = []
         self.component_type_list = []
@@ -254,25 +296,27 @@ class IDF_simu(IDF):
             self.cmd_index+=1                
 
     def _sensing_ctrl(self, state):
-        self.sensor_t = self._sensing(state) # sensor_t: the simulation results at timestep t
+        self._sensing(state) # sensor_t: the simulation results at timestep t
         self._control(state)
 
     def _check_sensor(self, key, value):
-        # to check
         key = key.replace('_', ' ')
-        val = key in self.rdd_df['Sensor'].values
+        val = key in list(self.sensor_list['sensor_type'])
         if not val:
             self.add('output:variable', variable_name = key, reporting_frequency = 'Timestep')
-        j = np.where(self.sensor_list['sensor_type'] == key)[0]
-        condi = []
-        if type(value) == str:
-            value = [value]
-        for value_i in value:
-            for i in j:
-                if value_i == self.sensor_list['sensor_name'][i]:
-                    condi.append(True)
-                    break
-        assert sum(condi) == len(value), 'Please make sure the sensor name is correct'
+            print('\033[93m'+'WARNING: automaically add <<' + key + '>> into Output:Variable, please make sure sensor value name is correct'+'\033[00m')
+            self._update == 1
+        else:
+            j = np.where(self.sensor_list['sensor_type'] == key)[0]
+            condi = []
+            if type(value) == str:
+                value = [value]
+            for value_i in value:
+                for i in j:
+                    if value_i == self.sensor_list['sensor_name'][i]:
+                        condi.append(True)
+                        break
+            assert sum(condi) == len(value), 'Please make sure the sensor name is correct'
 
     def _check_actuator(self, key, value):
         key = key.replace('__', '/')
@@ -290,14 +334,17 @@ class IDF_simu(IDF):
 
     def save(self, path = None):
         assert self.run_complete == 1, 'Please make sure the model ran successfully before saving results'
-        if path == None:
-            self.sensor_dic.to_excel(os.path.join(self.output_path, 'sensor_data.xlsx'))
-            self.cmd_dic.to_excel(os.path.join(self.output_path, 'cmd_data.xlsx'))
-        else:
-            if path[-5:] == '.xlsx' or path[-4:] == '.xls':
-                assert os.path.exists(Path(path).parent), "Path does not exists, please check"
-                self.sensor_dic.to_excel(path)
+        try:
+            if path == None:
+                if self.sensing:
+                    self.sensor_dic.to_excel(os.path.join(self.output_path, str(self.runtime_id) + '-sensor_data.xlsx'))
+                if self.control:
+                    self.cmd_dic.to_excel(os.path.join(self.output_path, str(self.runtime_id) + '-cmd_data.xlsx'))
             else:
                 assert os.path.exists(path), "Path does not exists, please check"
-                self.sensor_dic.to_excel(os.path.join(path, 'sensor_data.xlsx'))
-                self.cmd_dic.to_excel(os.path.join(path, 'cmd_data.xlsx'))
+                if self.sensing:
+                    self.sensor_dic.to_excel(os.path.join(path, str(self.runtime_id) + '-sensor_data.xlsx'))
+                if self.control:
+                    self.cmd_dic.to_excel(os.path.join(path, str(self.runtime_id) + '-cmd_data.xlsx'))
+        except:
+            pass

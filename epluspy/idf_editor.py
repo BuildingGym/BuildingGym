@@ -274,7 +274,7 @@ class IDF():
             field_data = self.idf_dic[class_type.upper()]
             for i in range(len(field_data)):
                 self._write_object(class_type, field_name, field_data[i], file_path, mode)
-            mode = 'a'
+                mode = 'a'
         print('\033[95m'+'===Successfully output idf file!==='+'\033[0m')
         self._update = 0
 

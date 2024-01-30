@@ -1,5 +1,4 @@
 ref/*
-test.py
 test
 *pyc
 *.idf
@@ -9,4 +8,3 @@ test
 *.pdf
 *.epw
 PlayGame_Test-v25-For-PV.py
-test_2.py
