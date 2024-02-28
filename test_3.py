@@ -25,14 +25,6 @@ if __name__ == '__main__':
     # myidf.write_idf_file()
     for i in range(5, 6):
         myidf = ep_simu(idf_file, epw_file, output_path, '2018-01-01', '2018-12-31', 30, True, True, i)
-        # myidf.delete_class('Output:Variable')
-        # myidf.sensor_call(Site_Outdoor_Air_Drybulb_Temperature = ['Environment'],
-        #                   Site_Outdoor_Air_Wetbulb_Temperature = ['Environment'],
-        #                   Plant_Supply_Side_Inlet_Temperature = 'CHW LOOP',
-        #                   Plant_Supply_Side_Outlet_Temperature = 'CHW LOOP',
-        #                   Plant_Supply_Side_Inlet_Mass_Flow_Rate = 'CHW LOOP',
-        #                   Chiller_Evaporator_Mass_Flow_Rate = ['CHILLER', 'CHILLER 1', 'CHILLER 2'],
-        #                   Chiller_Electricity_Energy = ['CHILLER', 'CHILLER 1', 'CHILLER 2'])
         myidf.sensor_call(Site_Outdoor_Air_Drybulb_Temperature = ['Environment'],
                           Site_Outdoor_Air_Wetbulb_Temperature = ['Environment'],
                           Chiller_Electricity_Energy = ['CHILLER', 'CHILLER 1', 'CHILLER 2'],
