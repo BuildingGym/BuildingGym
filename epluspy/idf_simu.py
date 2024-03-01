@@ -49,7 +49,8 @@ class IDF_simu(IDF):
         self._get_rdd()
         self._get_sensor_list()
 
-    def run(self):
+    def run(self, epsilon = 0):
+        self.epsilon = epsilon
         if self.sensing:
             assert self.sensor_def, 'Please make sure you have correcttly define the sensor using sensor_call()'        
         if self.control:
@@ -245,6 +246,10 @@ class IDF_simu(IDF):
                 self.sensor_dic = pd.concat([self.sensor_dic, sensor_dic_i])
             self.sensor_index+=1
             self.sensor_t = sensor_dic_i
+
+    def set_agent(self, agent, input_var):
+        self.agent = agent
+        self.input_var = input_var
 
     def actuator_call(self, **kwargs):
         """
