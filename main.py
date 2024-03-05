@@ -36,7 +36,10 @@ class dqn():
                                       args.exploration_fraction * args.total_timesteps,
                                       global_step)
             myidf.run(epsilon = epsilon)
+            myidf.save()
 
+    def cal_r(self):
+        pass
     
 def linear_schedule(start_e: float, end_e: float, duration: int, t: int):
     slope = (end_e - start_e) / duration
@@ -53,11 +56,12 @@ class ep_simu(idf_simu.IDF_simu):
             q_values = self.agent(torch.Tensor(value).to(args.devices))
             actions = torch.argmax(q_values, dim=0).cpu().numpy()
         actions = [24 + actions]
+        # actions = [22]
         return actions
         
 if __name__ == '__main__':
     idf_file = 'Main-PV-v4_ForTrain.idf'
-    epw_file = 'USA_CA_San.Francisco.Intl.AP.724940_TMY3.epw'
+    epw_file = 'SGP_Singapore.486980_IWEC.epw'
     output_path = 'test\\'
     epjson = 'C:\\EnergyPlusV9-4-0\\Energy+.schema.epJSON'
     args = tyro.cli(Args)
@@ -70,11 +74,15 @@ if __name__ == '__main__':
     myidf = ep_simu(idf_file, epw_file, output_path, '2018-02-03', '2018-03-05', 2, True, True, 5)
     myidf.sensor_call(Air_System_Outdoor_Air_Mass_Flow_Rate = 'BCA',
                       Site_Outdoor_Air_Drybulb_Temperature = ['Environment'],
-                      Other_Equipment_Total_Heating_Rate = ['BLOCK1:ZONE1 EQUIPMENT GAIN 1', 'BLOCK2:ZONE1 EQUIPMENT GAIN 1'])
+                      Zone_Mean_Air_Temperature=['BLOCK3:ZONE1'],
+                      Cooling_Coil_Total_Cooling_Rate=['BCA AHU COOLING COIL'],
+                      Zone_Other_Equipment_Total_Heating_Rate=['BLOCK3:ZONE1'],
+                      Lights_Total_Heating_Rate=['BLOCK3:ZONE1 GENERAL LIGHTING'],
+                      Zone_People_Sensible_Heating_Rate=['BLOCK3:ZONE1'],
+                      Other_Equipment_Total_Heating_Rate = ['BLOCK3:ZONE1 EQUIPMENT GAIN 1'])
     myidf.actuator_call(Schedule_Value = [['ALWAYS 24', 'Schedule:Compact']])
     # to update: check why need to be all capital
     myidf.set_agent(q_network, input_var)
     rl_env = dqn(myidf)
     rl_env.train()
-    myidf.save()
     a = 1

@@ -29,13 +29,7 @@ class IDF_simu(IDF):
         self.set_time_step(n_time_step)
         self.sensing = sensing
         self.control = control
-        self.sensor_index = 0
-        self.cmd_index = 0
         self.runtime_id = runtime_id
-        if self.sensing:
-            self.sensor_dic = {}
-        if self.control:
-            self.cmd_dic = {}            
         if type(self.start_date) == str or type(self.start_date) == str:
             self.start_date = datetime.strptime(self.start_date, '%Y-%m-%d').date()
             self.end_date = datetime.strptime(self.end_date, '%Y-%m-%d').date()
@@ -51,6 +45,12 @@ class IDF_simu(IDF):
 
     def run(self, epsilon = 0):
         self.epsilon = epsilon
+        if self.sensing:
+            self.sensor_dic = {}
+        if self.control:
+            self.cmd_dic = {}                    
+        self.sensor_index = 0
+        self.cmd_index = 0  
         if self.sensing:
             assert self.sensor_def, 'Please make sure you have correcttly define the sensor using sensor_call()'        
         if self.control:
@@ -110,7 +110,9 @@ class IDF_simu(IDF):
         self.api.state_manager.delete_state(self.state)
         if len(self.sensor_dic) >= self.total_step:
             self.sensor_dic = self.sensor_dic[-int(self.total_step):]
-            self.sensor_dic.insert(0, 'Time', self.ts)
+            self.cmd_dic = self.cmd_dic[-int(self.total_step):]
+            if not 'Time' in self.sensor_dic:
+                self.sensor_dic.insert(0, 'Time', self.ts)
         self.run_complete = 1
     
     def _dry_run(self):
@@ -275,6 +277,7 @@ class IDF_simu(IDF):
 
     def _control(self, state):
         cmd_dic_i = {}
+        # self.cmd_dic = {}
         assert self.control, 'Please initialize control as "True" in IDF_simu Class if you would like to call sensor during simulation'
         assert 'control_fun' in dir(self), "please define the control function as control_fun()"
         wp_flag = self.api.exchange.warmup_flag(state)
@@ -298,7 +301,7 @@ class IDF_simu(IDF):
                 self.cmd_dic = cmd_dic_i
             else:
                 self.cmd_dic = pd.concat([self.cmd_dic, cmd_dic_i])
-            self.cmd_index+=1                
+            self.cmd_index+=1
 
     def _sensing_ctrl(self, state):
         self._sensing(state) # sensor_t: the simulation results at timestep t
@@ -351,5 +354,6 @@ class IDF_simu(IDF):
                     self.sensor_dic.to_excel(os.path.join(path, str(self.runtime_id) + '-sensor_data.xlsx'))
                 if self.control:
                     self.cmd_dic.to_excel(os.path.join(path, str(self.runtime_id) + '-cmd_data.xlsx'))
+                    
         except:
             pass
