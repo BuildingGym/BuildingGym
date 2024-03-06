@@ -13,7 +13,7 @@ class Args:
     """if toggled, `torch.backends.cudnn.deterministic=False`"""
     cuda: bool = True
     """if toggled, cuda will be enabled by default"""
-    track: bool = True
+    track: bool = False
     """if toggled, this experiment will be tracked with Weights and Biases"""
     wandb_project_name: str = "cleanRL"
     """the wandb's project name"""
@@ -29,7 +29,7 @@ class Args:
     """the user or org name of the model repository from the Hugging Face Hub"""
 
     # Algorithm specific arguments
-    env_id: str = "CartPole-v1"
+    env_id: str = "EnergyGym-v1"
     """the id of the environment"""
     input_dim: int = 3
     """the id of the environment"""
@@ -57,7 +57,9 @@ class Args:
     """the ending epsilon for exploration"""
     exploration_fraction: float = 0.5
     """the fraction of `total-timesteps` it takes from start-e to go end-e"""
-    learning_starts: int = 10000
+    learning_starts: int = 3
     """timestep to start learning"""
-    train_frequency: int = 10
+    train_frequency: int = 1
     """the frequency of training"""
+    outlook_step: int = 5
+    """the number of steps to outlook for accumulate rewards"""

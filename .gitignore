@@ -9,3 +9,5 @@ test
 *.epw
 PlayGame_Test-v25-For-PV.py
 RL control ref/*
+runs/*
+wandb/*

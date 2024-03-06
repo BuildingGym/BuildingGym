@@ -49,6 +49,7 @@ class IDF_simu(IDF):
             self.sensor_dic = {}
         if self.control:
             self.cmd_dic = {}                    
+            self.action_dic = {}                    
         self.sensor_index = 0
         self.cmd_index = 0  
         if self.sensing:
@@ -111,6 +112,7 @@ class IDF_simu(IDF):
         if len(self.sensor_dic) >= self.total_step:
             self.sensor_dic = self.sensor_dic[-int(self.total_step):]
             self.cmd_dic = self.cmd_dic[-int(self.total_step):]
+            self.action_dic = self.action_dic[-int(self.total_step):]
             if not 'Time' in self.sensor_dic:
                 self.sensor_dic.insert(0, 'Time', self.ts)
         self.run_complete = 1
@@ -277,14 +279,14 @@ class IDF_simu(IDF):
 
     def _control(self, state):
         cmd_dic_i = {}
-        # self.cmd_dic = {}
+        action_dic_i = {}
         assert self.control, 'Please initialize control as "True" in IDF_simu Class if you would like to call sensor during simulation'
         assert 'control_fun' in dir(self), "please define the control function as control_fun()"
         wp_flag = self.api.exchange.warmup_flag(state)
         if not self.api.exchange.api_data_fully_ready(state):
             return None
         if wp_flag == 0:        
-            com = self.control_fun(self.sensor_t)
+            com, action = self.control_fun(self.sensor_t)
             assert type(com) == list, 'The output of the control_fun() should be list'
             assert len(com) == len(self.component_type_list), 'The length of command and the number of actuator should be same'
             for i in range(len(self.component_type_list)):
@@ -296,11 +298,15 @@ class IDF_simu(IDF):
                     ) # component_type, control_type, actuator_key
                 self.api.exchange.set_actuator_value(state , self.actuator_id, com[i])
                 cmd_dic_i[self.component_type_list[i]+'@'+self.control_type_list[i]+'@'+self.component_name_list[i]] = [com[i]]
+                action_dic_i[self.component_type_list[i]+'@'+self.control_type_list[i]+'@'+self.component_name_list[i]] = [action[i]]
             cmd_dic_i = pd.DataFrame(cmd_dic_i, index = [self.cmd_index])
+            action_dic_i = pd.DataFrame(action_dic_i, index = [self.cmd_index])
             if self.cmd_index == 0:
                 self.cmd_dic = cmd_dic_i
+                self.action_dic = action_dic_i
             else:
                 self.cmd_dic = pd.concat([self.cmd_dic, cmd_dic_i])
+                self.action_dic = pd.concat([self.action_dic, action_dic_i])
             self.cmd_index+=1
 
     def _sensing_ctrl(self, state):
