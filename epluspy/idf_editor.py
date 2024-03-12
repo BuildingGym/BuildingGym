@@ -157,7 +157,9 @@ class IDF():
         self._update = 1
         class_type = class_type.upper()
         if class_name == None and class_index == None:
-            a = 1
+            field_data_list = self.idf_dic[class_type]
+            j = list(np.arange(len(field_data_list)))
+            self._del(class_type, j, 'by_index')
         assert class_name == None or class_index == None, 'Please either specify class_name or class_index'
         if class_name is not None:
             if type(class_name) is not list:

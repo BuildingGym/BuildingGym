@@ -18,7 +18,8 @@ class IDF_simu(IDF):
         start_date/end_date: Datetime.date class or string with format "yyyy-mm-dd", e.g. 2018-01-01.
         """        
         super().__init__(idf_file, epw_file, output_path)
-        assert os.path.exists(output_path), f'{output_path} does not exist'
+        if not os.path.exists(output_path):
+            os.mkdir(output_path)
         assert os.path.exists(idf_file), f'{idf_file} does not exist'
         assert os.path.exists(epw_file), f'{epw_file} does not exist'
         self.sensor_def = False
@@ -111,8 +112,9 @@ class IDF_simu(IDF):
         self.api.state_manager.delete_state(self.state)
         if len(self.sensor_dic) >= self.total_step:
             self.sensor_dic = self.sensor_dic[-int(self.total_step):]
-            self.cmd_dic = self.cmd_dic[-int(self.total_step):]
-            self.action_dic = self.action_dic[-int(self.total_step):]
+            if self.control:
+                self.cmd_dic = self.cmd_dic[-int(self.total_step):]
+                self.action_dic = self.action_dic[-int(self.total_step):]
             if not 'Time' in self.sensor_dic:
                 self.sensor_dic.insert(0, 'Time', self.ts)
         self.run_complete = 1
@@ -184,7 +186,8 @@ class IDF_simu(IDF):
             component_name.append(j[1].strip()) # e.g. VAV_1 Supply Equipment Outlet Node
             component_type.append(j[2].strip()) # e.g. System Node Setpoint
             control_type.append(j[3].strip()) # e.g. Temperature Setpoint
-            unit.append(j[5].strip())
+            # unit.append(j[5].strip())
+            unit.append(j[-1].strip())
         self.edd_df = pd.DataFrame({'Component_name':component_name, 'Component_type':component_type,
                                     'Control_type':control_type, 'Unit':unit})
         self.edd_df.to_csv(os.path.join(self.output_path, '_dry run','edd.csv'))
@@ -226,11 +229,12 @@ class IDF_simu(IDF):
         if not self.api.exchange.api_data_fully_ready(state):
             return None
         if not wp_flag:
-            sensor_dic_i['year'] = self.api.exchange.year(state)
+            # sensor_dic_i['Year'] = self.api.exchange.year(state)
             sensor_dic_i['Month'] = self.api.exchange.month(state)
             sensor_dic_i['Day'] = self.api.exchange.day_of_month(state)
-            sensor_dic_i['hour'] = self.api.exchange.hour(state)
-            sensor_dic_i['min'] = self.api.exchange.minutes(state)
+            sensor_dic_i['Hour'] = self.api.exchange.hour(state)
+            sensor_dic_i['Min'] = self.api.exchange.minutes(state)
+            sensor_dic_i['Day_of_Week'] = self.api.exchange.day_of_week(state)
             for i in range(len(self.sensor_key_list)):
                 key = self.sensor_key_list[i]
                 value = self.sensor_value_list[i]
@@ -240,7 +244,7 @@ class IDF_simu(IDF):
                     self.sensor_i = self.api.exchange.get_variable_handle(
                         state, key, value_i
                         )
-                    # assert self.sensor_i != -1, "Fail to call sensor, please check"
+                    assert self.sensor_i != -1, "SENSOR NAME ERROE, please check sensor_name for sensor_call"
                     self.sensor_data = self.api.exchange.get_variable_value(state, self.sensor_i)
                     sensor_dic_i[key+'@'+value_i] = [self.sensor_data]
             sensor_dic_i = pd.DataFrame(sensor_dic_i, index = [self.sensor_index])
@@ -256,6 +260,8 @@ class IDF_simu(IDF):
         self.input_var = input_var
 
     def actuator_call(self, **kwargs):
+        if self.control == False:
+            return
         """
         Control type = [Component Unique Name, Component Type]
         """
@@ -273,7 +279,7 @@ class IDF_simu(IDF):
                 value = [value]
             for value_i in value:
                 self.control_type_list.append(key)
-                self.component_name_list.append(value_i[0])
+                self.component_name_list.append(value_i[0].upper())
                 self.component_type_list.append(value_i[1])
         self.actuator_def = True
 
@@ -330,7 +336,7 @@ class IDF_simu(IDF):
                     if value_i == self.sensor_list['sensor_name'][i]:
                         condi.append(True)
                         break
-            assert sum(condi) == len(value), 'Please make sure the sensor name is correct'
+            assert sum(condi) == len(value), f'Please make sure the sensor name is correct for key "{key}"'
 
     def _check_actuator(self, key, value):
         key = key.replace('__', '/')
@@ -341,7 +347,7 @@ class IDF_simu(IDF):
         condi = []
         for value_i in value:
             for i in j:
-                if value_i[0] == self.edd_df['Component_name'][i] and value_i[1] == self.edd_df['Component_type'][i]:
+                if value_i[0].upper() == self.edd_df['Component_name'][i] and value_i[1] == self.edd_df['Component_type'][i]:
                     condi.append(True)
                     break
         assert sum(condi) == len(value), 'Please make sure the actuator name (control type, component name, component type) is correct'
@@ -362,4 +368,4 @@ class IDF_simu(IDF):
                     self.cmd_dic.to_excel(os.path.join(path, str(self.runtime_id) + '-cmd_data.xlsx'))
                     
         except:
-            pass
+            print('\033[93m'+'WARNING: ===Failed to save the result files==='+'\033[0m')

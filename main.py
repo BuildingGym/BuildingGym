@@ -17,7 +17,7 @@ from gymnasium.spaces import Box
 from gymnasium.spaces import Discrete
 import wandb
 import math
-
+import pandas as pd
 
 # ALGO LOGIC: initialize agent here:
 class QNetwork(nn.Module):
@@ -45,7 +45,7 @@ class dqn():
         self.writer = SummaryWriter(f"runs/{self.run_name}")
         self.writer.add_text(
             "hyperparameters",
-            "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])))        
+            "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])))
         
     def train(self):
         if args.track:
@@ -83,8 +83,9 @@ class dqn():
                                       args.exploration_fraction * args.total_timesteps,
                                       global_step)
             myidf.run(epsilon = epsilon)
-            myidf.save()
+            self.label_working_time()
             self.cal_r()
+            myidf.save()
             if len(self.obs_index) == 0:
                 sensor_name_list = list(myidf.sensor_dic.columns)
                 for i in self.input_var:
@@ -93,14 +94,15 @@ class dqn():
             for i in range(myidf.sensor_dic.shape[0]-1):
                 obs = myidf.sensor_dic.iloc[i,self.obs_index]
                 next_obs = myidf.sensor_dic.iloc[i+1,self.obs_index]
-                rewards = myidf.sensor_dic['reward'][i]
+                rewards = myidf.sensor_dic.iloc[i, list(myidf.sensor_dic.columns).index('reward' )]
                 actions = myidf.action_dic.iloc[i, 0]
-                rb.add(np.array(obs),
-                       np.array(next_obs),
-                       np.array(actions),
-                       np.array(rewards),
-                       np.array([False]),
-                        '')
+                if myidf.sensor_dic['Working_time'][i]:
+                    rb.add(np.array(obs),
+                        np.array(next_obs),
+                        np.array(actions),
+                        np.array(rewards),
+                        np.array([False]),
+                            '')
             if global_step > args.learning_starts:
                 if global_step % args.train_frequency == 0:
                     data = rb.sample(args.batch_size)
@@ -110,7 +112,7 @@ class dqn():
                     old_val = self.q_network(data.observations).gather(1, data.actions).squeeze()
                     loss = F.mse_loss(td_target, old_val)
 
-                    if global_step % 100 == 0:
+                    if global_step % 10 == 0:
                         self.writer.add_scalar("losses/td_loss", loss, global_step)
                         self.writer.add_scalar("losses/q_values", old_val.mean().item(), global_step)
                         print("SPS:", int(global_step / (time.time() - start_time)))
@@ -140,14 +142,37 @@ class dqn():
             save_code=True,
         )
 
+    def label_working_time(self):
+        start = pd.to_datetime(args.work_time_start, format='%H:%M')
+        end = pd.to_datetime(args.work_time_end, format='%H:%M')
+        # remove data without enough outlook step
+        dt = int(60/myidf.n_time_step) * args.outlook_step
+        dt = pd.to_timedelta(dt, unit='min')
+        end -= dt
+        wt = [] # wt: working time label
+        for i in range(int(myidf.sensor_dic.shape[0])):
+            h = myidf.sensor_dic['Time'][i].minute
+            m = myidf.sensor_dic['Time'][i].hour
+            t = pd.to_datetime(str(h)+':'+str(m), format='%M:%S')
+            if t >= start and t <= end:
+                wt.append(True)
+            else:
+                wt.append(False)
+        myidf.sensor_dic['Working_time'] = wt
 
     def cal_r(self):
+        baseline = pd.read_csv('Data\Day_mean.csv')
+        reward = []
+        for j in range(myidf.n_days+1):
+            for k in range(24*myidf.n_time_step):
+                reward_i = abs(myidf.sensor_dic['Chiller Electricity Rate@DOE REF 1980-2004 WATERCOOLED  CENTRIFUGAL CHILLER 0 1100TONS 0.7KW/TON'][j*24*myidf.n_time_step+k] - baseline['Day_mean'][k])
+                reward.append(reward_i)
         # Realtime reward function
-        myidf.sensor_dic['reward'] = myidf.sensor_dic['Cooling Coil Total Cooling Rate@BCA AHU COOLING COIL']/3000
+        myidf.sensor_dic['reward'] = reward
         # Return return function (future accmulated reward)
         R_list = []
         for i in range(myidf.sensor_dic.shape[0] - args.outlook_step):
-            reward_list = myidf.sensor_dic['reward'][i:i+5]
+            reward_list = myidf.sensor_dic['reward'][i:(i+ args.outlook_step)]
             R = 0
             for r in reward_list[::-1]:
                 R = r + R * args.gamma
@@ -155,8 +180,9 @@ class dqn():
         
         # Remove data without enough outlook steps
         myidf.sensor_dic = myidf.sensor_dic[:-args.outlook_step]
-        myidf.cmd_dic = myidf.cmd_dic[:-args.outlook_step]
-        # append Return data
+        if myidf.control:
+            myidf.cmd_dic = myidf.cmd_dic[:-args.outlook_step]
+            # append Return data
         myidf.sensor_dic['Return'] = R_list
     
 def linear_schedule(start_e: float, end_e: float, duration: int, t: int):
@@ -173,13 +199,14 @@ class ep_simu(idf_simu.IDF_simu):
         else:
             q_values = self.agent(torch.Tensor(value).to(args.devices))
             actions = torch.argmax(q_values, dim=0).cpu().numpy()
-        com = [24 + actions]
-        # com = [22]
+        # com = [19 + actions]
+        com = [28]
         return com, [actions]
         
 if __name__ == '__main__':
-    idf_file = 'Main-PV-v4_ForTrain.idf'
-    epw_file = 'SGP_Singapore.486980_IWEC.epw'
+    run_baseline = True
+    idf_file = 'Large office - 1AV940.idf'
+    epw_file = 'USA_FL_Miami.722020_TMY2.epw'
     output_path = 'test\\'
     epjson = 'C:\\EnergyPlusV9-4-0\\Energy+.schema.epJSON'
     args = tyro.cli(Args)
@@ -189,22 +216,33 @@ if __name__ == '__main__':
     target_network = QNetwork(args.input_dim, args.output_dim).to(device)
     target_network.load_state_dict(q_network.state_dict())
     input_var = ['Site Outdoor Air Drybulb Temperature@Environment',
-                  'Zone Mean Air Temperature@BLOCK3:ZONE1',
-                  'Zone Other Equipment Total Heating Rate@BLOCK3:ZONE1']
+                  'Zone Mean Air Temperature@CORE_BOTTOM ZN',
+                  'Zone People Sensible Heating Rate@CORE_BOTTOM ZN']
+    # TO ADD: CHECK input_var
     with open(epjson, 'r') as f:
         data = json.load(f)
-    myidf = ep_simu(idf_file, epw_file, output_path, '2018-02-03', '2018-03-05', 2, True, True, 5)
-    myidf.sensor_call(Air_System_Outdoor_Air_Mass_Flow_Rate = 'BCA',
+    myidf = ep_simu(idf_file, epw_file, output_path, '2018-08-01', '2018-08-31', 6, True, True, 5)
+    if run_baseline:
+        myidf.edit('Thermostatsetpoint:dualsetpoint', 'All', cooling_setpoint_temperature_schedule_name = 'Large Office ClgSetp')
+    else:
+        myidf.edit('Thermostatsetpoint:dualsetpoint', 'All', cooling_setpoint_temperature_schedule_name = 'ANN-ctrl')
+    myidf.sensor_call(Air_System_Outdoor_Air_Mass_Flow_Rate = 'VAV_1',
+                      Chiller_Electricity_Rate  = ['DOE REF 1980-2004 WATERCOOLED  CENTRIFUGAL CHILLER 0 1100TONS 0.7KW/TON'],
                       Site_Outdoor_Air_Drybulb_Temperature = ['Environment'],
-                      Zone_Mean_Air_Temperature=['BLOCK3:ZONE1'],
-                      Cooling_Coil_Total_Cooling_Rate=['BCA AHU COOLING COIL'],
-                      Zone_Other_Equipment_Total_Heating_Rate=['BLOCK3:ZONE1'],
-                      Lights_Total_Heating_Rate=['BLOCK3:ZONE1 GENERAL LIGHTING'],
-                      Zone_People_Sensible_Heating_Rate=['BLOCK3:ZONE1'],
-                      Other_Equipment_Total_Heating_Rate = ['BLOCK3:ZONE1 EQUIPMENT GAIN 1'])
-    myidf.actuator_call(Schedule_Value = [['ALWAYS 24', 'Schedule:Compact']])
+                      Zone_Mean_Air_Temperature=['CORE_BOTTOM ZN'],
+                      Cooling_Coil_Total_Cooling_Rate=['VAV_1 CLG COIL'],
+                      Lights_Total_Heating_Rate=['CORE_BOTTOM ZN OFFICE WHOLEBUILDING - LG OFFICE LIGHTS'],
+                      Zone_People_Sensible_Heating_Rate=['CORE_BOTTOM ZN'])
+    # To update: directly update to original files
+    myidf.actuator_call(Schedule_Value = [['ANN-ctrl', 'Schedule:Compact']])
+    # myidf.delete_class('AvailabilityManager:Scheduled')
+    # myidf.delete_class('AvailabilityManager:NightCycle')
+    # myidf.delete_class('AvailabilityManagerAssignmentList')
     # to update: check why need to be all capital
     myidf.set_agent(q_network, input_var)
+    # myidf.run()
+    # myidf.save()
+    # TO ADD: CHECK AGENT
     rl_env = dqn(myidf, input_var, q_network, target_network)
     rl_env.train()
-    a = 1
+    # a = 1

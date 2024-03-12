@@ -47,7 +47,7 @@ class Args:
     """the discount factor gamma"""
     tau: float = 1.0
     """the target network update rate"""
-    target_network_frequency: int = 500
+    target_network_frequency: int = 100
     """the timesteps it takes to update the target network"""
     batch_size: int = 128
     """the batch size of sample from the reply memory"""
@@ -57,9 +57,13 @@ class Args:
     """the ending epsilon for exploration"""
     exploration_fraction: float = 0.5
     """the fraction of `total-timesteps` it takes from start-e to go end-e"""
-    learning_starts: int = 3
+    learning_starts: int = 1
     """timestep to start learning"""
     train_frequency: int = 1
     """the frequency of training"""
-    outlook_step: int = 5
+    work_time_start: str = '6:00'
+    """the begining of working time"""
+    work_time_end: str = '22:00'
+    """the end of working time"""        
+    outlook_step: int = 6
     """the number of steps to outlook for accumulate rewards"""
