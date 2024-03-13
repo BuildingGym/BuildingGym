@@ -221,6 +221,27 @@ class IDF_simu(IDF):
             self.sensor_key_list.append(key)
             self.sensor_value_list.append(value)
         self.sensor_def = True
+
+    # def actuator_call(self, **kwargs):
+    #     """
+    #     sensor_key_name = sensor_value_name
+    #     """
+    #     if not self.sensing:
+    #         print('\033[93mWARNING: you call the sensor but not activate the sensing function.\
+    #               Set self.sensing as True if you want to sense during simulation\033[00m')
+    #     self.control_type_sensing_list = []
+    #     self.component_name_sensing_list = []
+    #     self.component_type_sensing_list = []
+    #     for key, value in kwargs.items():
+    #         key = key.replace('__', '/')
+    #         key = key.replace('_', ' ')
+    #         self._check_actuator(key, value)
+    #         if len(np.array(value).shape) == 1:
+    #             value = [value]
+    #         for value_i in value:
+    #             self.control_type_sensing_list.append(key)
+    #             self.component_name_sensing_list.append(value_i[0].upper())
+    #             self.component_type_sensing_list.append(value_i[1])
         
     def _sensing(self, state):
         assert self.sensing, 'Please initialize sensing as "True" in IDF_simu Class if you would like to call sensor during simulation'
@@ -247,6 +268,21 @@ class IDF_simu(IDF):
                     assert self.sensor_i != -1, "SENSOR NAME ERROE, please check sensor_name for sensor_call"
                     self.sensor_data = self.api.exchange.get_variable_value(state, self.sensor_i)
                     sensor_dic_i[key+'@'+value_i] = [self.sensor_data]
+            # for i in range(len(self.component_name_sensing_list)):
+
+            #     key = self.component_type_sensing_list[i]
+            #     value = self.component_name_sensing_list[i]
+            #     if type(value) is not list:
+            #         value = [value]
+            #     for value_i in value:                           
+            #         self.sensor_i = self.api.exchange.get_actuator_handle(
+            #             state, self.component_type_sensing_list[i], self.control_type_sensing_list[i], self.component_name_sensing_list[i].upper()
+            #             ) # component_type, control_type, actuator_key
+                          
+            #         assert self.sensor_i != -1, "SENSOR NAME ERROE, please check sensor_name for sensor_call"
+            #         self.sensor_data = self.api.exchange.get_actuator_value(state, self.sensor_i)
+            #         sensor_dic_i[key+'@'+value_i] = [self.sensor_data]
+
             sensor_dic_i = pd.DataFrame(sensor_dic_i, index = [self.sensor_index])
             if self.sensor_index == 0:
                 self.sensor_dic = sensor_dic_i
@@ -259,7 +295,7 @@ class IDF_simu(IDF):
         self.agent = agent
         self.input_var = input_var
 
-    def actuator_call(self, **kwargs):
+    def actuator_ctrl(self, **kwargs):
         if self.control == False:
             return
         """
@@ -268,9 +304,9 @@ class IDF_simu(IDF):
         if not self.control:
             print('\033[40m' + 'WARNING: you call the actuator but not activate the control function.\
                   Set self.control as True if you want to control using actuator' + '\033[00m')
-        self.control_type_list = []
-        self.component_name_list = []
-        self.component_type_list = []
+        self.control_type_ctrl_list = []
+        self.component_name_ctrl_list = []
+        self.component_type_ctrl_list = []
         for key, value in kwargs.items():
             key = key.replace('__', '/')
             key = key.replace('_', ' ')
@@ -278,9 +314,9 @@ class IDF_simu(IDF):
             if len(np.array(value).shape) == 1:
                 value = [value]
             for value_i in value:
-                self.control_type_list.append(key)
-                self.component_name_list.append(value_i[0].upper())
-                self.component_type_list.append(value_i[1])
+                self.control_type_ctrl_list.append(key)
+                self.component_name_ctrl_list.append(value_i[0].upper())
+                self.component_type_ctrl_list.append(value_i[1])
         self.actuator_def = True
 
     def _control(self, state):
@@ -294,17 +330,17 @@ class IDF_simu(IDF):
         if wp_flag == 0:        
             com, action = self.control_fun(self.sensor_t)
             assert type(com) == list, 'The output of the control_fun() should be list'
-            assert len(com) == len(self.component_type_list), 'The length of command and the number of actuator should be same'
-            for i in range(len(self.component_type_list)):
+            assert len(com) == len(self.component_type_ctrl_list), 'The length of command and the number of actuator should be same'
+            for i in range(len(self.component_type_ctrl_list)):
                 self.actuator_id = self.api.exchange.get_actuator_handle(
                     state,
-                    self.component_type_list[i],
-                    self.control_type_list[i],
-                    self.component_name_list[i]
+                    self.component_type_ctrl_list[i],
+                    self.control_type_ctrl_list[i],
+                    self.component_name_ctrl_list[i]
                     ) # component_type, control_type, actuator_key
                 self.api.exchange.set_actuator_value(state , self.actuator_id, com[i])
-                cmd_dic_i[self.component_type_list[i]+'@'+self.control_type_list[i]+'@'+self.component_name_list[i]] = [com[i]]
-                action_dic_i[self.component_type_list[i]+'@'+self.control_type_list[i]+'@'+self.component_name_list[i]] = [action[i]]
+                cmd_dic_i[self.component_type_ctrl_list[i]+'@'+self.control_type_ctrl_list[i]+'@'+self.component_name_ctrl_list[i]] = [com[i]]
+                action_dic_i[self.component_type_ctrl_list[i]+'@'+self.control_type_ctrl_list[i]+'@'+self.component_name_ctrl_list[i]] = [action[i]]
             cmd_dic_i = pd.DataFrame(cmd_dic_i, index = [self.cmd_index])
             action_dic_i = pd.DataFrame(action_dic_i, index = [self.cmd_index])
             if self.cmd_index == 0:

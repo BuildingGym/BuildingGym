@@ -31,7 +31,7 @@ class Args:
     # Algorithm specific arguments
     env_id: str = "EnergyGym-v1"
     """the id of the environment"""
-    input_dim: int = 3
+    input_dim: int = 5
     """the id of the environment"""
     output_dim: int = 5
     """the id of the environment"""        
