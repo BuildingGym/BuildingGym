@@ -13,11 +13,11 @@ class Args:
     """if toggled, `torch.backends.cudnn.deterministic=False`"""
     cuda: bool = True
     """if toggled, cuda will be enabled by default"""
-    track: bool = False
+    track: bool = True
     """if toggled, this experiment will be tracked with Weights and Biases"""
-    wandb_project_name: str = "cleanRL"
+    wandb_project_name: str = "energygym"
     """the wandb's project name"""
-    wandb_entity: str = None
+    wandb_entity: str = 'buildinggym'
     """the entity (team) of wandb's project"""
     capture_video: bool = False
     """whether to capture videos of the agent performances (check out `videos` folder)"""
@@ -47,7 +47,7 @@ class Args:
     """the discount factor gamma"""
     tau: float = 1.0
     """the target network update rate"""
-    target_network_frequency: int = 100
+    target_network_frequency: int = 3
     """the timesteps it takes to update the target network"""
     batch_size: int = 128
     """the batch size of sample from the reply memory"""

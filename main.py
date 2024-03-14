@@ -70,7 +70,6 @@ class dqn():
         for global_step in range(args.total_timesteps):
             if args.track:
                 wandb.log({'random_curve':global_step/100+random.random()},step=global_step)
-                wandb.log({'log_curve': math.log(global_step+1)},step=global_step)        
             # ALGO LOGIC: put action logic here
             epsilon = linear_schedule(args.start_e, args.end_e, args.exploration_fraction * args.total_timesteps, global_step)
             # if random.random() < epsilon:
@@ -85,13 +84,17 @@ class dqn():
             myidf.run(epsilon = epsilon)
             self.label_working_time()
             self.cal_r()
-            myidf.save()
             if len(self.obs_index) == 0:
                 sensor_name_list = list(myidf.sensor_dic.columns)
                 for i in self.input_var:
                     assert i in sensor_name_list, "The input variable is not in the sensor list, please add it"
                     self.obs_index.append(sensor_name_list.index(i))
             self.normalize_input()
+            if np.mean(myidf.sensor_dic['reward'][myidf.sensor_dic['Working_time'] == True]) > 0.1:
+                path_i = os.path.join('Archive results', str(int(time.time())))
+                os.mkdir(path_i)
+                myidf.save(path_i)
+                torch.save(q_network.state_dict(), os.path.join(path_i, 'model.pth'))
             for i in range(myidf.sensor_dic.shape[0]-1):
                 obs = myidf.sensor_dic.iloc[i,self.obs_index]
                 next_obs = myidf.sensor_dic.iloc[i+1,self.obs_index]
@@ -105,7 +108,7 @@ class dqn():
                         np.array([False]),
                             '')
             if global_step > args.learning_starts:
-                for k in range(5):
+                for k in range(30):
                     if global_step % args.train_frequency == 0:
                         data = rb.sample(args.batch_size)
                         with torch.no_grad():
@@ -114,9 +117,11 @@ class dqn():
                         old_val = self.q_network(data.observations).gather(1, data.actions).squeeze()
                         loss = F.mse_loss(td_target, old_val)
 
-                        if global_step % 10 == 0:
+                        if global_step % 2 == 0:
                             self.writer.add_scalar("losses/td_loss", loss, global_step)
                             self.writer.add_scalar("losses/q_values", old_val.mean().item(), global_step)
+                            wandb.log({'mean_reward_curve': np.mean(myidf.sensor_dic['reward'][myidf.sensor_dic['Working_time'] == True])}, step=global_step)        
+
                             print("SPS:", int(global_step / (time.time() - start_time)))
                             self.writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
 
@@ -130,7 +135,7 @@ class dqn():
                     for target_network_param, q_network_param in zip(self.target_network.parameters(), self.q_network.parameters()):
                         target_network_param.data.copy_(
                             args.tau * q_network_param.data + (1.0 - args.tau) * target_network_param.data
-                        )            
+                        )
 
     def normalize_input(self):
         nor_min = np.array([22.8, 22, 0, 0, 0])
@@ -175,7 +180,7 @@ class dqn():
         for j in range(myidf.n_days+1):
             for k in range(24*myidf.n_time_step):
                 energy_i = myidf.sensor_dic['Chiller Electricity Rate@DOE REF 1980-2004 WATERCOOLED  CENTRIFUGAL CHILLER 0 1100TONS 0.7KW/TON'][j*24*myidf.n_time_step+k]
-                reward_i = 1 - abs(energy_i - baseline['Day_mean'][k])/baseline['Day_mean'][k]
+                reward_i = round(0.3 - abs(energy_i ** 2 - baseline['Day_mean'][k] ** 2)/baseline['Day_mean'][k] ** 2,1)
                 reward.append(reward_i)
         # Realtime reward function
         myidf.sensor_dic['reward'] = reward
@@ -260,4 +265,5 @@ if __name__ == '__main__':
     # TO ADD: CHECK AGENT
     rl_env = dqn(myidf, input_var, q_network, target_network)
     rl_env.train()
+    wandb.finish()
     # a = 1
