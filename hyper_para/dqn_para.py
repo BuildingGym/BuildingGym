@@ -35,23 +35,23 @@ class Args:
     """the id of the environment"""
     output_dim: int = 5
     """the id of the environment"""        
-    total_timesteps: int = 200000
+    total_timesteps: int = 1000
     """total timesteps of the experiments"""
-    learning_rate: float = 2.5e-4
+    learning_rate: float = 1e-2
     """the learning rate of the optimizer"""
     num_envs: int = 1
     """the number of parallel game environments"""
-    buffer_size: int = 10000
+    buffer_size: int = 1000
     """the replay memory buffer size"""
-    gamma: float = 0.99
+    gamma: float = 0.9
     """the discount factor gamma"""
     tau: float = 1.0
     """the target network update rate"""
-    target_network_frequency: int = 3
+    target_network_frequency: int = 30
     """the timesteps it takes to update the target network"""
-    batch_size: int = 128
+    batch_size: int = 64
     """the batch size of sample from the reply memory"""
-    start_e: float = 1
+    start_e: float = 0.5
     """the starting epsilon for exploration"""
     end_e: float = 0.05
     """the ending epsilon for exploration"""

@@ -24,11 +24,11 @@ class QNetwork(nn.Module):
     def __init__(self, input_dim, output_dim):
         super().__init__()
         self.network = nn.Sequential(
-            nn.Linear(input_dim, 120),
+            nn.Linear(input_dim, 64),
             nn.ReLU(),
-            nn.Linear(120, 84),
+            nn.Linear(64, 32),
             nn.ReLU(),
-            nn.Linear(84, output_dim),
+            nn.Linear(32, output_dim),
         )
 
     def forward(self, x):
@@ -68,8 +68,6 @@ class dqn():
         
         # TRY NOT TO MODIFY: start the game
         for global_step in range(args.total_timesteps):
-            if args.track:
-                wandb.log({'random_curve':global_step/100+random.random()},step=global_step)
             # ALGO LOGIC: put action logic here
             epsilon = linear_schedule(args.start_e, args.end_e, args.exploration_fraction * args.total_timesteps, global_step)
             # if random.random() < epsilon:
@@ -90,7 +88,7 @@ class dqn():
                     assert i in sensor_name_list, "The input variable is not in the sensor list, please add it"
                     self.obs_index.append(sensor_name_list.index(i))
             self.normalize_input()
-            if np.mean(myidf.sensor_dic['reward'][myidf.sensor_dic['Working_time'] == True]) > 0.1:
+            if np.mean(myidf.sensor_dic['result'][myidf.sensor_dic['Working_time'] == True]) > 0.85:
                 path_i = os.path.join('Archive results', str(int(time.time())))
                 os.mkdir(path_i)
                 myidf.save(path_i)
@@ -108,7 +106,7 @@ class dqn():
                         np.array([False]),
                             '')
             if global_step > args.learning_starts:
-                for k in range(30):
+                for k in range(1):
                     if global_step % args.train_frequency == 0:
                         data = rb.sample(args.batch_size)
                         with torch.no_grad():
@@ -120,7 +118,10 @@ class dqn():
                         if global_step % 2 == 0:
                             self.writer.add_scalar("losses/td_loss", loss, global_step)
                             self.writer.add_scalar("losses/q_values", old_val.mean().item(), global_step)
-                            wandb.log({'mean_reward_curve': np.mean(myidf.sensor_dic['reward'][myidf.sensor_dic['Working_time'] == True])}, step=global_step)        
+                            wandb.log({'reward_curve': np.mean(myidf.sensor_dic['reward'][myidf.sensor_dic['Working_time'] == True])}, step=global_step)        
+                            wandb.log({'result_curve': np.mean(myidf.sensor_dic['result'][myidf.sensor_dic['Working_time'] == True])}, step=global_step)        
+                            wandb.log({'loss_curve': float(loss.detach().numpy())}, step=global_step)        
+                            # wandb.log({'epsilon_curve': float(epsilon)}, step=global_step)        
 
                             print("SPS:", int(global_step / (time.time() - start_time)))
                             self.writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
@@ -177,13 +178,17 @@ class dqn():
     def cal_r(self):
         baseline = pd.read_csv('Data\Day_mean.csv')
         reward = []
+        result = []
         for j in range(myidf.n_days+1):
             for k in range(24*myidf.n_time_step):
                 energy_i = myidf.sensor_dic['Chiller Electricity Rate@DOE REF 1980-2004 WATERCOOLED  CENTRIFUGAL CHILLER 0 1100TONS 0.7KW/TON'][j*24*myidf.n_time_step+k]
                 reward_i = round(0.3 - abs(energy_i ** 2 - baseline['Day_mean'][k] ** 2)/baseline['Day_mean'][k] ** 2,1)
+                result_i = round(1 - abs(energy_i - baseline['Day_mean'][k])/baseline['Day_mean'][k],1)
                 reward.append(reward_i)
+                result.append(result_i)
         # Realtime reward function
         myidf.sensor_dic['reward'] = reward
+        myidf.sensor_dic['result'] = result
         # Return return function (future accmulated reward)
         R_list = []
         for i in range(myidf.sensor_dic.shape[0] - args.outlook_step):
