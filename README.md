@@ -10,9 +10,9 @@
 
 🎓 BuildingGym is free for students, educators, and academic researchers.
 
-<p align="center">
-<img src="docs\README_images\Package structure.png" width="66%" >
-</p>
+<!-- <p align="center"> -->
+<!-- <img src="docs\README_images\Package structure.png" width="66%" > -->
+<!-- </p> -->
 
 ## Features
 - 😏 Applied to all user-defined EnergyPlus model
