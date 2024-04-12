@@ -1,8 +1,8 @@
 import os
-import sys
-sys.path.append('C:/EnergyPlusV9-4-0')
+#import sys
+#sys.path.append('C:/EnergyPlusV9-4-0')
 import numpy as np
-from pyenergyplus.api import EnergyPlusAPI
+#from pyenergyplus.api import EnergyPlusAPI
 import json
 from datetime import datetime
 
@@ -88,7 +88,7 @@ class IDF():
         return dic_idf
 
     def _read_idd(self):
-        idd_path = 'C:\\EnergyPlusV9-4-0\\Energy+.schema.epJSON'
+        idd_path = './Energy+.schema.epJSON'
         with open(idd_path, 'r') as f:
             idd = json.load(f)               
             f.close()

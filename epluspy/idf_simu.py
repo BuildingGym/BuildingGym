@@ -1,13 +1,11 @@
 import os
-import sys
-sys.path.append('C:/EnergyPlusV9-4-0')
 import numpy as np
-from pyenergyplus.api import EnergyPlusAPI
 from epluspy.idf_editor import IDF
 from datetime import datetime
 import pandas as pd
 import re
 from pathlib import Path
+import energyplus.ooep as ooep
 
 class IDF_simu(IDF):
     def __init__(self, idf_file, epw_file, output_path, start_date, end_date, n_time_step, sensing = False, control = False, runtime_id = 0) -> None:
@@ -54,9 +52,9 @@ class IDF_simu(IDF):
         self.sensor_index = 0
         self.cmd_index = 0  
         if self.sensing:
-            assert self.sensor_def, 'Please make sure you have correcttly define the sensor using sensor_call()'        
+            assert self.sensor_def, 'Please make sure you have correctly define the sensor using sensor_call()'        
         if self.control:
-            assert self.actuator_def, 'Please make sure you have correcttly define the actuator using actuator_call()'              
+            assert self.actuator_def, 'Please make sure you have correctly define the actuator using actuator_call()'              
         self.run_period(self.start_date, self.end_date)
         if self._update == 1 or not os.path.exists(os.path.join(self.output_path, 'output.idf')):
             print('\033[95m'+'Save the latest model first, please wait for a while ....'+'\033[0m')
@@ -64,8 +62,11 @@ class IDF_simu(IDF):
         ep_file_path = os.path.join(self.output_path, 'EP_file')
         if not os.path.exists(ep_file_path):
             os.mkdir(ep_file_path)
-        self.api = EnergyPlusAPI()
-        self.state = self.api.state_manager.new_state()
+
+        simulator = ooep.Simulator()
+        self.api = simulator._core.api
+        self.state = simulator._core.state
+
         if self.sensing == True and self.control == False:
             # self.api.runtime.callback_end_zone_timestep_before_zone_reporting(self.state, self._sensing)
             if self.runtime_id == 0:
@@ -139,8 +140,9 @@ class IDF_simu(IDF):
                 assert f.closed == True, f'Please check if {os.path.join(self.dry_run_path, "eplusout.csv")} is closed'
         except Exception:
             pass
-        self.api = EnergyPlusAPI()
-        self.state = self.api.state_manager.new_state()
+        self.simulator = simulator = ooep.Simulator()
+        self.api = simulator._core.api
+        self.state = simulator._core.state
         self.api.runtime.run_energyplus(self.state , ['-d', self.dry_run_path, '-w', self.epw_file, os.path.join(self.dry_run_path, 'output.idf')])
         self.api.runtime.clear_callbacks()
         self.api.state_manager.reset_state(self.state)
@@ -206,7 +208,7 @@ class IDF_simu(IDF):
         self.sensor_list = pd.DataFrame({'sensor_name': sensor_name_list, 'sensor_type': sensor_type_list})
         self.sensor_list.to_csv(os.path.join(self.output_path, '_dry run','rdd.csv'))
     
-    def sensor_call(self, **kwargs):
+    def sensor_call(self, kwargs):
         """
         sensor_key_name = sensor_value_name
         """
@@ -220,6 +222,7 @@ class IDF_simu(IDF):
             self._check_sensor(key, value)
             self.sensor_key_list.append(key)
             self.sensor_value_list.append(value)
+            
         self.sensor_def = True
         
     def _sensing(self, state):
@@ -235,18 +238,18 @@ class IDF_simu(IDF):
             sensor_dic_i['Hour'] = self.api.exchange.hour(state)
             sensor_dic_i['Min'] = self.api.exchange.minutes(state)
             sensor_dic_i['Day_of_Week'] = self.api.exchange.day_of_week(state)
-            for i in range(len(self.sensor_key_list)):
-                key = self.sensor_key_list[i]
-                value = self.sensor_value_list[i]
+            for key, value in zip(self.sensor_key_list, self.sensor_value_list):
                 if type(value) is not list:
                     value = [value]
-                for value_i in value:                           
-                    self.sensor_i = self.api.exchange.get_variable_handle(
-                        state, key, value_i
+                for value_i in value:
+                    self.sensor_data = self.simulator.variables.getdefault(
+                        ooep.OutputVariable.Ref(
+                            type=key,
+                            key=value_i,
                         )
-                    assert self.sensor_i != -1, "SENSOR NAME ERROE, please check sensor_name for sensor_call"
-                    self.sensor_data = self.api.exchange.get_variable_value(state, self.sensor_i)
+                    ).value
                     sensor_dic_i[key+'@'+value_i] = [self.sensor_data]
+
             sensor_dic_i = pd.DataFrame(sensor_dic_i, index = [self.sensor_index])
             if self.sensor_index == 0:
                 self.sensor_dic = sensor_dic_i
@@ -287,7 +290,7 @@ class IDF_simu(IDF):
         cmd_dic_i = {}
         action_dic_i = {}
         assert self.control, 'Please initialize control as "True" in IDF_simu Class if you would like to call sensor during simulation'
-        assert 'control_fun' in dir(self), "please define the control function as control_fun()"
+        assert hasattr(self, 'control_fun'), "please define the control function as control_fun()"
         wp_flag = self.api.exchange.warmup_flag(state)
         if not self.api.exchange.api_data_fully_ready(state):
             return None

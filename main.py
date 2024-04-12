@@ -1,5 +1,26 @@
 from epluspy import idf_editor
 from epluspy import idf_simu
+import energyplus.ooep as _ooep_
+import gymnasium as _gymnasium_
+import numpy as _numpy_
+import energyplus.ooep.addons
+from energyplus.ooep.components.variables import (
+    Actuator,
+    OutputVariable,
+)
+import logging
+from energyplus.ooep.addons.logging import LogProvider
+
+from energyplus.ooep.addons.rl.gymnasium.spaces import VariableBox
+from energyplus.ooep import (
+    Simulator,
+    Model,
+    Weather,
+    Report,
+)
+import asyncio
+from energyplus.ooep.addons.rl.gymnasium import ThinEnv
+
 import os
 import json
 from hyper_para.dqn_para import Args
@@ -18,6 +39,7 @@ from gymnasium.spaces import Discrete
 import wandb
 import math
 import pandas as pd
+import logging
 
 # ALGO LOGIC: initialize agent here:
 class QNetwork(nn.Module):
@@ -202,13 +224,66 @@ class ep_simu(idf_simu.IDF_simu):
         # com = [19 + actions]
         com = [28]
         return com, [actions]
-        
+    
+# async def energyplus_running(idf_file,epw_file):
+#     await simulator.awaitable.run_forever(
+#     input=Simulator.InputSpecs(
+#         model=Model().open(
+#             idf_file
+#         ),
+#         weather=Weather().open(epw_file),
+#     ),
+#     # output=Simulator.OutputSpecs(
+#     #     report=Report().open('/tmp/ooep-report-9e1287d2-8e75-4cf5-bbc5-f76580b56a69'),
+#     # ),
+#     options=Simulator.RuntimeOptions(
+#         #design_day=True,
+#     ),
+#     )
+    
+#     # TODO
+#     #simulator.variables.on(...)[...]
+
 if __name__ == '__main__':
+    simulator = Simulator().add(
+    LogProvider(),
+    )
+    logging.basicConfig(level='INFO')
+    # simulator.add(
+    #     thinenv := ThinEnv(
+    #         action_space=_gymnasium_.spaces.Dict({
+    #                     'thermostat': VariableBox(
+    #                         low=15., high=16.,
+    #                         dtype=_numpy_.float32,
+    #                         shape=(),
+    #                     ).bind(Actuator.Ref(
+    #                         type='Zone Temperature Control',
+    #                         control_type='Heating Setpoint',
+    #                         key='CORE_MID',
+    #                     ))
+    #                 }),    
+    #         observation_space=_gymnasium_.spaces.Dict({
+    #             'temperature': VariableBox(
+    #                 low=-_numpy_.inf, high=+_numpy_.inf,
+    #                 dtype=_numpy_.float32,
+    #                 shape=(),
+    #             ).bind(OutputVariable.Ref(
+    #                 type='People Air Temperature',
+    #                 key='CORE_MID',
+    #             )),
+    #         }),
+    #     )
+    # )
+    # try:
+    #     print(thinenv.observe())
+    # except _ooep_.TemporaryUnavailableError as e:
+    #     pass
+
     run_baseline = True
     idf_file = 'Large office - 1AV940.idf'
     epw_file = 'USA_FL_Miami.722020_TMY2.epw'
-    output_path = 'test\\'
-    epjson = 'C:\\EnergyPlusV9-4-0\\Energy+.schema.epJSON'
+    output_path = './test'
+    epjson = './Energy+.schema.epJSON'
     args = tyro.cli(Args)
     q_network = QNetwork(args.input_dim, args.output_dim)
     optimizer = optim.Adam(q_network.parameters(), lr=args.learning_rate)
@@ -218,21 +293,25 @@ if __name__ == '__main__':
     input_var = ['Site Outdoor Air Drybulb Temperature@Environment',
                   'Zone Mean Air Temperature@CORE_BOTTOM ZN',
                   'Zone People Sensible Heating Rate@CORE_BOTTOM ZN']
-    # TO ADD: CHECK input_var
-    with open(epjson, 'r') as f:
-        data = json.load(f)
+    # # TO ADD: CHECK input_var
+    # with open(epjson, 'r') as f:
+    #     data = json.load(f)
+
+    # loop = asyncio.get_running_loop()
+    # task = loop.create_task(energyplus_running(idf_file = idf_file,
+    #                                            epw_file = epw_file))
     myidf = ep_simu(idf_file, epw_file, output_path, '2018-08-01', '2018-08-31', 6, True, True, 5)
     if run_baseline:
         myidf.edit('Thermostatsetpoint:dualsetpoint', 'All', cooling_setpoint_temperature_schedule_name = 'Large Office ClgSetp')
     else:
         myidf.edit('Thermostatsetpoint:dualsetpoint', 'All', cooling_setpoint_temperature_schedule_name = 'ANN-ctrl')
-    myidf.sensor_call(Air_System_Outdoor_Air_Mass_Flow_Rate = 'VAV_1',
+    myidf.sensor_call(dict(Air_System_Outdoor_Air_Mass_Flow_Rate = ['VAV_1'],
                       Chiller_Electricity_Rate  = ['DOE REF 1980-2004 WATERCOOLED  CENTRIFUGAL CHILLER 0 1100TONS 0.7KW/TON'],
                       Site_Outdoor_Air_Drybulb_Temperature = ['Environment'],
                       Zone_Mean_Air_Temperature=['CORE_BOTTOM ZN'],
                       Cooling_Coil_Total_Cooling_Rate=['VAV_1 CLG COIL'],
                       Lights_Total_Heating_Rate=['CORE_BOTTOM ZN OFFICE WHOLEBUILDING - LG OFFICE LIGHTS'],
-                      Zone_People_Sensible_Heating_Rate=['CORE_BOTTOM ZN'])
+                      Zone_People_Sensible_Heating_Rate=['CORE_BOTTOM ZN']))
     # To update: directly update to original files
     myidf.actuator_call(Schedule_Value = [['ANN-ctrl', 'Schedule:Compact']])
     # myidf.delete_class('AvailabilityManager:Scheduled')
