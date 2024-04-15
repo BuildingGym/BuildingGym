@@ -60,7 +60,7 @@ class IDF_simu(IDF):
         self.run_period(self.start_date, self.end_date)
         if self._update == 1 or not os.path.exists(os.path.join(self.output_path, 'output.idf')):
             print('\033[95m'+'Save the latest model first, please wait for a while ....'+'\033[0m')
-        # self.write_idf_file(self.output_path) # To add version id
+        self.write_idf_file(self.output_path) # To add version id
         ep_file_path = os.path.join(self.output_path, 'EP_file')
         if not os.path.exists(ep_file_path):
             os.mkdir(ep_file_path)
