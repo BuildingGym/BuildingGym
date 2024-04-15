@@ -120,7 +120,7 @@ class dqn():
                             self.writer.add_scalar("losses/q_values", old_val.mean().item(), global_step)
                             wandb.log({'reward_curve': np.mean(myidf.sensor_dic['reward'][myidf.sensor_dic['Working_time'] == True])}, step=global_step)        
                             wandb.log({'result_curve': np.mean(myidf.sensor_dic['result'][myidf.sensor_dic['Working_time'] == True])}, step=global_step)        
-                            wandb.log({'loss_curve': float(loss.detach().numpy())}, step=global_step)        
+                            wandb.log({'loss_curve': float(loss.cpu().detach().numpy())}, step=global_step)        
                             # wandb.log({'epsilon_curve': float(epsilon)}, step=global_step)        
 
                             print("SPS:", int(global_step / (time.time() - start_time)))
@@ -230,9 +230,9 @@ if __name__ == '__main__':
     output_path = 'test\\'
     epjson = 'C:\\EnergyPlusV9-4-0\\Energy+.schema.epJSON'
     args = tyro.cli(Args)
-    q_network = QNetwork(args.input_dim, args.output_dim)
-    optimizer = optim.Adam(q_network.parameters(), lr=args.learning_rate)
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
+    q_network = QNetwork(args.input_dim, args.output_dim).to(device)
+    optimizer = optim.Adam(q_network.parameters(), lr=args.learning_rate)
     target_network = QNetwork(args.input_dim, args.output_dim).to(device)
     target_network.load_state_dict(q_network.state_dict())
     input_var = ['Site Outdoor Air Drybulb Temperature@Environment',

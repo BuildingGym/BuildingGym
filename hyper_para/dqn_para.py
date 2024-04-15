@@ -3,8 +3,8 @@ import os
 
 @dataclass
 class Args:
-    devices: str = 'cpu'
-    """Use CPU to train the model"""
+    devices: str = 'cuda'
+    """Use GPU to train the model"""
     exp_name: str = os.path.basename(__file__)[: -len(".py")]
     """the name of this experiment"""
     seed: int = 1
