@@ -1,4 +1,3 @@
-# usage: conda env create --name envname --file=environment.yml
 dependencies:
   - python=3.10
   - pip
