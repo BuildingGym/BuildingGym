@@ -1,0 +1,7 @@
+--extra-index-url https://test.pypi.org/simple
+git+https://github.com/BuildingGym/EnergyPlus-OOEP
+git+https://github.com/SGHVAIC/EnergyPlus-Datasets
+gymnasium
+ray[rllib] 
+torch
+tqdm
