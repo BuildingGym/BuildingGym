@@ -25689,6 +25689,8 @@ Output:Variable,*,Other Equipment Total Heating Rate,Hourly;
 Output:Variable,*,Air System Outdoor Air Mass Flow Rate,Hourly;
 Output:Variable,*,Zone Mean Air Temperature,Hourly;
 Output:Variable,*,Zone Other Equipment Total Heating Rate,Hourly;
+Output:Variable,*,People Occupant Count,Hourly;
+Output:Variable,*,Schedule Value,Hourly;
 
 !-   ===========  ALL OBJECTS IN CLASS: OUTPUT:METER ===========
 

@@ -3,8 +3,8 @@ import os
 
 @dataclass
 class Args:
-    devices: str = 'cpu'
-    """Use CPU to train the model"""
+    devices: str = 'cuda'
+    """Use GPU to train the model"""
     exp_name: str = os.path.basename(__file__)[: -len(".py")]
     """the name of this experiment"""
     seed: int = 1
@@ -13,11 +13,11 @@ class Args:
     """if toggled, `torch.backends.cudnn.deterministic=False`"""
     cuda: bool = True
     """if toggled, cuda will be enabled by default"""
-    track: bool = False
+    track: bool = True
     """if toggled, this experiment will be tracked with Weights and Biases"""
-    wandb_project_name: str = "cleanRL"
+    wandb_project_name: str = "energygym"
     """the wandb's project name"""
-    wandb_entity: str = None
+    wandb_entity: str = 'buildinggym'
     """the entity (team) of wandb's project"""
     capture_video: bool = False
     """whether to capture videos of the agent performances (check out `videos` folder)"""
@@ -31,27 +31,27 @@ class Args:
     # Algorithm specific arguments
     env_id: str = "EnergyGym-v1"
     """the id of the environment"""
-    input_dim: int = 3
+    input_dim: int = 5
     """the id of the environment"""
     output_dim: int = 5
     """the id of the environment"""        
-    total_timesteps: int = 200000
+    total_timesteps: int = 1000
     """total timesteps of the experiments"""
-    learning_rate: float = 2.5e-4
+    learning_rate: float = 1e-2
     """the learning rate of the optimizer"""
     num_envs: int = 1
     """the number of parallel game environments"""
-    buffer_size: int = 10000
+    buffer_size: int = 1000
     """the replay memory buffer size"""
-    gamma: float = 0.99
+    gamma: float = 0.9
     """the discount factor gamma"""
     tau: float = 1.0
     """the target network update rate"""
-    target_network_frequency: int = 100
+    target_network_frequency: int = 30
     """the timesteps it takes to update the target network"""
-    batch_size: int = 128
+    batch_size: int = 64
     """the batch size of sample from the reply memory"""
-    start_e: float = 1
+    start_e: float = 0.5
     """the starting epsilon for exploration"""
     end_e: float = 0.05
     """the ending epsilon for exploration"""

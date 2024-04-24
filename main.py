@@ -24,11 +24,11 @@ class QNetwork(nn.Module):
     def __init__(self, input_dim, output_dim):
         super().__init__()
         self.network = nn.Sequential(
-            nn.Linear(input_dim, 120),
+            nn.Linear(input_dim, 64),
             nn.ReLU(),
-            nn.Linear(120, 84),
+            nn.Linear(64, 32),
             nn.ReLU(),
-            nn.Linear(84, output_dim),
+            nn.Linear(32, output_dim),
         )
 
     def forward(self, x):
@@ -68,9 +68,6 @@ class dqn():
         
         # TRY NOT TO MODIFY: start the game
         for global_step in range(args.total_timesteps):
-            if args.track:
-                wandb.log({'random_curve':global_step/100+random.random()},step=global_step)
-                wandb.log({'log_curve': math.log(global_step+1)},step=global_step)        
             # ALGO LOGIC: put action logic here
             epsilon = linear_schedule(args.start_e, args.end_e, args.exploration_fraction * args.total_timesteps, global_step)
             # if random.random() < epsilon:
@@ -85,12 +82,17 @@ class dqn():
             myidf.run(epsilon = epsilon)
             self.label_working_time()
             self.cal_r()
-            myidf.save()
             if len(self.obs_index) == 0:
                 sensor_name_list = list(myidf.sensor_dic.columns)
                 for i in self.input_var:
                     assert i in sensor_name_list, "The input variable is not in the sensor list, please add it"
                     self.obs_index.append(sensor_name_list.index(i))
+            self.normalize_input()
+            if np.mean(myidf.sensor_dic['result'][myidf.sensor_dic['Working_time'] == True]) > 0.85:
+                path_i = os.path.join('Archive results', str(int(time.time())))
+                os.mkdir(path_i)
+                myidf.save(path_i)
+                torch.save(q_network.state_dict(), os.path.join(path_i, 'model.pth'))
             for i in range(myidf.sensor_dic.shape[0]-1):
                 obs = myidf.sensor_dic.iloc[i,self.obs_index]
                 next_obs = myidf.sensor_dic.iloc[i+1,self.obs_index]
@@ -104,31 +106,44 @@ class dqn():
                         np.array([False]),
                             '')
             if global_step > args.learning_starts:
-                if global_step % args.train_frequency == 0:
-                    data = rb.sample(args.batch_size)
-                    with torch.no_grad():
-                        target_max, _ = self.target_network(data.next_observations).max(dim=1)
-                        td_target = data.rewards.flatten() + args.gamma * target_max
-                    old_val = self.q_network(data.observations).gather(1, data.actions).squeeze()
-                    loss = F.mse_loss(td_target, old_val)
+                for k in range(1):
+                    if global_step % args.train_frequency == 0:
+                        data = rb.sample(args.batch_size)
+                        with torch.no_grad():
+                            target_max, _ = self.target_network(data.next_observations).max(dim=1)
+                            td_target = data.rewards.flatten() + args.gamma * target_max
+                        old_val = self.q_network(data.observations).gather(1, data.actions).squeeze()
+                        loss = F.mse_loss(td_target, old_val)
 
-                    if global_step % 10 == 0:
-                        self.writer.add_scalar("losses/td_loss", loss, global_step)
-                        self.writer.add_scalar("losses/q_values", old_val.mean().item(), global_step)
-                        print("SPS:", int(global_step / (time.time() - start_time)))
-                        self.writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
+                        if global_step % 2 == 0:
+                            self.writer.add_scalar("losses/td_loss", loss, global_step)
+                            self.writer.add_scalar("losses/q_values", old_val.mean().item(), global_step)
+                            wandb.log({'reward_curve': np.mean(myidf.sensor_dic['reward'][myidf.sensor_dic['Working_time'] == True])}, step=global_step)        
+                            wandb.log({'result_curve': np.mean(myidf.sensor_dic['result'][myidf.sensor_dic['Working_time'] == True])}, step=global_step)        
+                            wandb.log({'loss_curve': float(loss.cpu().detach().numpy())}, step=global_step)        
+                            # wandb.log({'epsilon_curve': float(epsilon)}, step=global_step)        
 
-                    # optimize the model
-                    optimizer.zero_grad()
-                    loss.backward()
-                    optimizer.step()
+                            print("SPS:", int(global_step / (time.time() - start_time)))
+                            self.writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
+
+                        # optimize the model
+                        optimizer.zero_grad()
+                        loss.backward()
+                        optimizer.step()
 
                 # update target network
                 if global_step % args.target_network_frequency == 0:
                     for target_network_param, q_network_param in zip(self.target_network.parameters(), self.q_network.parameters()):
                         target_network_param.data.copy_(
                             args.tau * q_network_param.data + (1.0 - args.tau) * target_network_param.data
-                        )            
+                        )
+
+    def normalize_input(self):
+        nor_min = np.array([22.8, 22, 0, 0, 0])
+        nor_max = np.array([33.3, 27, 1, 1, 1])
+        nor_input = (myidf.sensor_dic.iloc[:,self.obs_index] - nor_min)/(nor_max - nor_min)
+        myidf.sensor_dic.iloc[:,self.obs_index] = nor_input
+
 
     def call_track(self):
         import wandb
@@ -151,9 +166,9 @@ class dqn():
         end -= dt
         wt = [] # wt: working time label
         for i in range(int(myidf.sensor_dic.shape[0])):
-            h = myidf.sensor_dic['Time'][i].minute
-            m = myidf.sensor_dic['Time'][i].hour
-            t = pd.to_datetime(str(h)+':'+str(m), format='%M:%S')
+            h = myidf.sensor_dic['Time'][i].hour
+            m = myidf.sensor_dic['Time'][i].minute
+            t = pd.to_datetime(str(h)+':'+str(m), format='%H:%M')
             if t >= start and t <= end:
                 wt.append(True)
             else:
@@ -163,12 +178,17 @@ class dqn():
     def cal_r(self):
         baseline = pd.read_csv('Data\Day_mean.csv')
         reward = []
+        result = []
         for j in range(myidf.n_days+1):
             for k in range(24*myidf.n_time_step):
-                reward_i = abs(myidf.sensor_dic['Chiller Electricity Rate@DOE REF 1980-2004 WATERCOOLED  CENTRIFUGAL CHILLER 0 1100TONS 0.7KW/TON'][j*24*myidf.n_time_step+k] - baseline['Day_mean'][k])
+                energy_i = myidf.sensor_dic['Chiller Electricity Rate@DOE REF 1980-2004 WATERCOOLED  CENTRIFUGAL CHILLER 0 1100TONS 0.7KW/TON'][j*24*myidf.n_time_step+k]
+                reward_i = round(0.3 - abs(energy_i ** 2 - baseline['Day_mean'][k] ** 2)/baseline['Day_mean'][k] ** 2,1)
+                result_i = round(1 - abs(energy_i - baseline['Day_mean'][k])/baseline['Day_mean'][k],1)
                 reward.append(reward_i)
+                result.append(result_i)
         # Realtime reward function
         myidf.sensor_dic['reward'] = reward
+        myidf.sensor_dic['result'] = result
         # Return return function (future accmulated reward)
         R_list = []
         for i in range(myidf.sensor_dic.shape[0] - args.outlook_step):
@@ -199,50 +219,56 @@ class ep_simu(idf_simu.IDF_simu):
         else:
             q_values = self.agent(torch.Tensor(value).to(args.devices))
             actions = torch.argmax(q_values, dim=0).cpu().numpy()
-        # com = [19 + actions]
-        com = [28]
+        com = [23 + actions]
+        # com = [23]
         return com, [actions]
         
 if __name__ == '__main__':
-    run_baseline = True
+    is_train = True
     idf_file = 'Large office - 1AV940.idf'
     epw_file = 'USA_FL_Miami.722020_TMY2.epw'
     output_path = 'test\\'
     epjson = 'C:\\EnergyPlusV9-4-0\\Energy+.schema.epJSON'
     args = tyro.cli(Args)
-    q_network = QNetwork(args.input_dim, args.output_dim)
-    optimizer = optim.Adam(q_network.parameters(), lr=args.learning_rate)
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
+    q_network = QNetwork(args.input_dim, args.output_dim).to(device)
+    optimizer = optim.Adam(q_network.parameters(), lr=args.learning_rate)
     target_network = QNetwork(args.input_dim, args.output_dim).to(device)
     target_network.load_state_dict(q_network.state_dict())
     input_var = ['Site Outdoor Air Drybulb Temperature@Environment',
                   'Zone Mean Air Temperature@CORE_BOTTOM ZN',
-                  'Zone People Sensible Heating Rate@CORE_BOTTOM ZN']
+                  'Schedule Value@'+'Large Office Bldg Occ'.upper(),
+                  'Schedule Value@'+'Large Office Bldg Light'.upper(),
+                  'Schedule Value@'+'Large Office Bldg Equip'.upper(),]
     # TO ADD: CHECK input_var
     with open(epjson, 'r') as f:
         data = json.load(f)
     myidf = ep_simu(idf_file, epw_file, output_path, '2018-08-01', '2018-08-31', 6, True, True, 5)
-    if run_baseline:
-        myidf.edit('Thermostatsetpoint:dualsetpoint', 'All', cooling_setpoint_temperature_schedule_name = 'Large Office ClgSetp')
-    else:
+    if is_train:
         myidf.edit('Thermostatsetpoint:dualsetpoint', 'All', cooling_setpoint_temperature_schedule_name = 'ANN-ctrl')
+    else:
+        myidf.edit('Thermostatsetpoint:dualsetpoint', 'All', cooling_setpoint_temperature_schedule_name = 'Large Office ClgSetp')
     myidf.sensor_call(Air_System_Outdoor_Air_Mass_Flow_Rate = 'VAV_1',
                       Chiller_Electricity_Rate  = ['DOE REF 1980-2004 WATERCOOLED  CENTRIFUGAL CHILLER 0 1100TONS 0.7KW/TON'],
                       Site_Outdoor_Air_Drybulb_Temperature = ['Environment'],
                       Zone_Mean_Air_Temperature=['CORE_BOTTOM ZN'],
                       Cooling_Coil_Total_Cooling_Rate=['VAV_1 CLG COIL'],
                       Lights_Total_Heating_Rate=['CORE_BOTTOM ZN OFFICE WHOLEBUILDING - LG OFFICE LIGHTS'],
-                      Zone_People_Sensible_Heating_Rate=['CORE_BOTTOM ZN'])
+                      Zone_People_Sensible_Heating_Rate=['CORE_BOTTOM ZN'],
+                      Schedule_Value = ['Large Office Bldg Occ'.upper(), 'Large Office Bldg Light'.upper(),
+                                        'Large Office Bldg Equip'.upper()])
+                        # to update: check why need to be all capital
+    # myidf.actuator_call(Schedule_Value = [['Large Office Bldg Equip', 'Schedule:Year']])
+    myidf.actuator_ctrl(Schedule_Value = [['ANN-ctrl', 'Schedule:Compact']])
     # To update: directly update to original files
-    myidf.actuator_call(Schedule_Value = [['ANN-ctrl', 'Schedule:Compact']])
     # myidf.delete_class('AvailabilityManager:Scheduled')
     # myidf.delete_class('AvailabilityManager:NightCycle')
     # myidf.delete_class('AvailabilityManagerAssignmentList')
-    # to update: check why need to be all capital
     myidf.set_agent(q_network, input_var)
     # myidf.run()
     # myidf.save()
     # TO ADD: CHECK AGENT
     rl_env = dqn(myidf, input_var, q_network, target_network)
     rl_env.train()
+    wandb.finish()
     # a = 1
