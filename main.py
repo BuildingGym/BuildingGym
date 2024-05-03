@@ -2,7 +2,7 @@ from epluspy import idf_editor
 from epluspy import idf_simu
 import os
 import json
-from hyper_para.dqn_para import Args
+from rl.dqn.dqn_para import Args
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -220,7 +220,7 @@ class ep_simu(idf_simu.IDF_simu):
             q_values = self.agent(torch.Tensor(value).to(args.devices))
             actions = torch.argmax(q_values, dim=0).cpu().numpy()
         com = [23 + actions]
-        # com = [23]
+        com = [26]
         return com, [actions]
         
 if __name__ == '__main__':
