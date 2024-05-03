@@ -3,7 +3,7 @@ import os
 
 @dataclass
 class Args:
-    devices: str = 'cuda'
+    devices: str = 'cpu'
     """Use GPU to train the model"""
     exp_name: str = os.path.basename(__file__)[: -len(".py")]
     """the name of this experiment"""
@@ -11,7 +11,7 @@ class Args:
     """seed of the experiment"""
     torch_deterministic: bool = True
     """if toggled, `torch.backends.cudnn.deterministic=False`"""
-    cuda: bool = True
+    cuda: bool = False
     """if toggled, cuda will be enabled by default"""
     track: bool = True
     """if toggled, this experiment will be tracked with Weights and Biases"""
@@ -57,7 +57,7 @@ class Args:
     """the ending epsilon for exploration"""
     exploration_fraction: float = 0.5
     """the fraction of `total-timesteps` it takes from start-e to go end-e"""
-    learning_starts: int = 1
+    learning_starts: int = 0
     """timestep to start learning"""
     train_frequency: int = 1
     """the frequency of training"""
@@ -65,5 +65,7 @@ class Args:
     """the begining of working time"""
     work_time_end: str = '22:00'
     """the end of working time"""        
+    n_time_step: int = 6
+    """the number of steps in one hour"""
     outlook_step: int = 6
     """the number of steps to outlook for accumulate rewards"""
