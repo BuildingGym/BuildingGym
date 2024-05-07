@@ -152,7 +152,7 @@ class dqn():
             entity=args.wandb_entity,
             sync_tensorboard=True,
             config=vars(args),
-            name=self.run_name,
+            name='dxl-'+self.run_name,
             # monitor_gym=True,
             save_code=True,
         )
