@@ -62,14 +62,6 @@ async def energyplus_running(idf_file,epw_file):
         ),
     ) 
 
-
-
-# loop = asyncio.get_event_loop()
-# task = [loop.create_task(energyplus_running('Large office - 1AV232.idf',
-#                                             'USA_FL_Miami.722020_TMY2.epw'))]
-# loop.run_until_complete(asyncio.wait(task))
-# loop.close()
-
 observation_space = _gymnasium_.spaces.Dict({
             't_out': VariableBox(
                 low=22.8, high=33.3,
@@ -138,13 +130,16 @@ simulator.add(
     )
 )
 
+
+
 class dqn():
-    def __init__(self, observation_var, action_var) -> None:
+    def __init__(self, observation_var, action_var, auto_fine_tune = False, sweep_config = {}) -> None:
         self.observation_var = observation_var
         self.action_var = action_var
+        self.sweep_config = sweep_config
         self.args = tyro.cli(Args)
-        self.device = torch.device("cuda" if torch.cuda.is_available() and self.args.cuda else "cpu")
         self.run_name = f"{self.args.env_id}__{self.args.exp_name}__{self.args.seed}__{int(time.time())}"
+        self.device = torch.device("cuda" if torch.cuda.is_available() and self.args.cuda else "cpu")
         self.writer = SummaryWriter(f"runs/{self.run_name}")
         self.writer.add_text(
             "hyperparameters",
@@ -154,9 +149,25 @@ class dqn():
         self.optimizer = self.set_optimizer()
         simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
 
+
+    def train_auto_fine_tune(self):
+        with wandb.init(
+                project=self.args.wandb_project_name,
+                entity=self.args.wandb_entity,
+                sync_tensorboard=True,
+                config=self.sweep_config,
+                name=self.run_name,
+                save_code=True,
+            ):
+            self.args = wandb.config
+            for k, v in tyro.cli(Args).__dict__.items():
+                if k not in self.args:
+                    self.args[str(k)] = v
+            self.train()
+
     def train(self):
-        if self.args.track:
-            self.call_track()
+        # if self.args.track:
+        #     self.call_track()
         # TRY NOT TO MODIFY: seeding
         random.seed(self.args.seed)
         np.random.seed(self.args.seed)
@@ -188,7 +199,8 @@ class dqn():
             self.label_working_time()
             self.cal_r()
             # self.normalize_input()
-            if np.mean(self.sensor_dic['result'][self.sensor_dic['Working_time'] == True]) > 0.85:
+            Performance = np.mean(self.sensor_dic['result'][self.sensor_dic['Working_time'] == True])
+            if  Performance>0.85:
                 path_i = os.path.join('Archive results', str(int(time.time())))
                 os.mkdir(path_i)
                 self.sensor_dic.to_csv(os.path.join(path_i, 'results.csv'))
@@ -220,6 +232,14 @@ class dqn():
                             self.writer.add_scalar("losses/td_loss", loss, global_step)
                             self.writer.add_scalar("losses/q_values", old_val.mean().item(), global_step)
                             if self.args.track:
+                                wandb.init(
+                                    project=self.args.wandb_project_name,
+                                    entity=self.args.wandb_entity,
+                                    sync_tensorboard=True,
+                                    config=self.args,
+                                    name=self.run_name,
+                                    save_code=True,
+                                )
                                 wandb.log({'reward_curve': np.mean(self.sensor_dic['reward'][self.sensor_dic['Working_time'] == True])}, step=global_step)        
                                 wandb.log({'result_curve': np.mean(self.sensor_dic['result'][self.sensor_dic['Working_time'] == True])}, step=global_step)        
                                 wandb.log({'loss_curve': float(loss.cpu().detach().numpy())}, step=global_step)        
@@ -262,16 +282,8 @@ class dqn():
         self.sensor_dic = ts_m[1:]
 
     def call_track(self):
-        wandb.init(
-            project=self.args.wandb_project_name,
-            entity=self.args.wandb_entity,
-            sync_tensorboard=True,
-            config=vars(self.args),
-            name=self.run_name,
-            # monitor_gym=True,
-            save_code=True,
-        )
-        
+        pass
+
     def handler(self, __event):
         global thinenv
         try:
@@ -362,6 +374,7 @@ class dqn():
         baseline = pd.read_csv('Data\Day_mean.csv')
         reward = []
         result = []
+        # Realtime reward function
         for j in range(self.sensor_dic.shape[0]):
             energy_i = self.sensor_dic['Chiller Electricity Rate'].iloc[j]
             k = j % (24*self.args.n_time_step)
@@ -370,14 +383,6 @@ class dqn():
             result_i = round(1 - abs(energy_i - baseline_i)/baseline_i,1)
             reward.append(reward_i)
             result.append(result_i)            
-        # for j in range(n_days):
-        #     for k in range(24*self.args.n_time_step):
-        #         energy_i = self.sensor_dic['Chiller Electricity Rate'][j*24*self.args.n_time_step+k]
-        #         reward_i = round(0.3 - abs(energy_i ** 2 - baseline['Day_mean'][k] ** 2)/baseline['Day_mean'][k] ** 2,1)
-        #         result_i = round(1 - abs(energy_i - baseline['Day_mean'][k])/baseline['Day_mean'][k],1)
-        #         reward.append(reward_i)
-        #         result.append(result_i)
-        # Realtime reward function
         self.sensor_dic['reward'] = reward
         self.sensor_dic['result'] = result
         # Return return function (future accmulated reward)
@@ -396,8 +401,32 @@ class dqn():
             # append Return data
         self.sensor_dic['Return'] = R_list        
 
+if __name__ == '__main__':
+    default_paras = tyro.cli(Args)
+    parameters_dict = {
+    'optimizer': {
+        'values': ['adam', 'sgd']
+        },
+    'learning_rate': {
+        'values': [1e-2, 1e-3, 1e-4]
+        },
+    'batch_size': {
+          'values': [64, 128]
+        },
+    }
+    sweep_config = {
+    'method': 'random'
+    }
+    metric = {
+    'name': 'Performance',
+    'goal': 'maximize'   
+    }
+    sweep_config['metric'] = metric
+    sweep_config['parameters'] = parameters_dict
 
-observation_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
-action_var = ['Thermostat']
-a = dqn(observation_var, action_var)
-a.train()
+    # sweep_id = wandb.sweep(sweep_config, project="energygym-auto")
+    observation_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
+    action_var = ['Thermostat']
+    a = dqn(observation_var, action_var, True, sweep_config)
+    # wandb.agent(sweep_id, a.train_auto_fine_tune, count=5) 
+    a.train()
