@@ -195,6 +195,7 @@ class dqn():
                                       self.args.exploration_fraction * self.args.total_timesteps,
                                       global_step)
             self.run()
+            self.normalize_input()
             # self.resample()
             self.label_working_time()
             self.cal_r()
@@ -284,6 +285,12 @@ class dqn():
     def call_track(self):
         pass
 
+    def normalize_input(self):
+        nor_min = np.array([22.8, 22, 0, 0, 0])
+        nor_max = np.array([33.3, 27, 1, 1, 1])
+        nor_input = (self.sensor_dic[self.observation_var] - nor_min)/(nor_max - nor_min)
+        self.sensor_dic[self.observation_var] = nor_input        
+            
     def handler(self, __event):
         global thinenv
         try:
@@ -305,8 +312,8 @@ class dqn():
                 actions = torch.argmax(q_values, dim=0).cpu().numpy()
             com = 23. + actions
 
-            # act = thinenv.act({'Thermostat': com})
-            act = thinenv.act({'Thermostat': 26})
+            act = thinenv.act({'Thermostat': com})
+            # act = thinenv.act({'Thermostat': 26})
             # thinenv.act(
             #     thinenv.action_space.sample()
             # )

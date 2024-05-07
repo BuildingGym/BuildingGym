@@ -220,12 +220,12 @@ class ep_simu(idf_simu.IDF_simu):
             q_values = self.agent(torch.Tensor(value).to(args.devices))
             actions = torch.argmax(q_values, dim=0).cpu().numpy()
         com = [23 + actions]
-        com = [26]
+        # com = [26]
         return com, [actions]
         
 if __name__ == '__main__':
     is_train = True
-    idf_file = 'Large office - 1AV940.idf'
+    idf_file = 'Large office - 1AV940-2.idf'
     epw_file = 'USA_FL_Miami.722020_TMY2.epw'
     output_path = 'test\\'
     epjson = 'C:\\EnergyPlusV9-4-0\\Energy+.schema.epJSON'
