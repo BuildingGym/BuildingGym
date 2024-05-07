@@ -305,7 +305,8 @@ class dqn():
                 actions = torch.argmax(q_values, dim=0).cpu().numpy()
             com = 23. + actions
 
-            act = thinenv.act({'Thermostat': com})
+            # act = thinenv.act({'Thermostat': com})
+            act = thinenv.act({'Thermostat': 26})
             # thinenv.act(
             #     thinenv.action_space.sample()
             # )
