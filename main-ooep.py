@@ -308,7 +308,7 @@ class dqn():
             if random.random() < self.epsilon:
                 actions = random.sample(list(np.arange(0, self.args.output_dim)), 1)[0]
             else:
-                q_values = self.q_network(state).to(self.args.devices)  
+                q_values = self.q_network(state).to(self.device)  
                 actions = torch.argmax(q_values, dim=0).cpu().numpy()
             com = 23. + actions
 
@@ -350,7 +350,7 @@ class dqn():
         if random.random() < self.epsilon:
             actions = random.sample(list(np.arange(0, 5)), 1)[0]
         else:
-            q_values = self.agent(torch.Tensor(observation).to(self.args.devices))
+            q_values = self.agent(torch.Tensor(observation).to(self.device))
             actions = torch.argmax(q_values, dim=0).cpu().numpy()
         com = [23 + actions]
         # com = [23]
@@ -412,15 +412,24 @@ class dqn():
 if __name__ == '__main__':
     default_paras = tyro.cli(Args)
     parameters_dict = {
-    'optimizer': {
-        'values': ['adam', 'sgd']
-        },
     'learning_rate': {
         'values': [1e-2, 1e-3, 1e-4]
         },
     'batch_size': {
-          'values': [64, 128]
+          'values': [32, 64, 128]
         },
+    'tau': {
+          'values': [0.9, 0.8]
+        },     
+    'start_e': {
+          'values': [0.8, 0.5, 0.2]
+        },     
+    'train_frequency': {
+          'values': [1, 5, 10]
+        },   
+    'target_network_frequency': {
+          'values': [5, 20, 30]
+        },                                
     }
     sweep_config = {
     'method': 'random'
@@ -432,9 +441,9 @@ if __name__ == '__main__':
     sweep_config['metric'] = metric
     sweep_config['parameters'] = parameters_dict
 
-    # sweep_id = wandb.sweep(sweep_config, project="energygym-auto")
+    sweep_id = wandb.sweep(sweep_config, project="energygym-auto")
     observation_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
     action_var = ['Thermostat']
     a = dqn(observation_var, action_var, True, sweep_config)
-    # wandb.agent(sweep_id, a.train_auto_fine_tune, count=5) 
-    a.train()
+    wandb.agent(sweep_id, a.train_auto_fine_tune, count=20) 
+    # a.train()

@@ -3,16 +3,14 @@ import os
 
 @dataclass
 class Args:
-    devices: str = 'cuda'
-    """Use GPU to train the model"""
+    cuda: bool = True
+    """if toggled, cuda will be enabled by default, use GPU to train model"""
     exp_name: str = os.path.basename(__file__)[: -len(".py")]
     """the name of this experiment"""
     seed: int = 1
     """seed of the experiment"""
     torch_deterministic: bool = True
     """if toggled, `torch.backends.cudnn.deterministic=False`"""
-    cuda: bool = True
-    """if toggled, cuda will be enabled by default"""
     track: bool = True
     """if toggled, this experiment will be tracked with Weights and Biases"""
     wandb_project_name: str = "energygym"
