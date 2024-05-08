@@ -233,16 +233,17 @@ class dqn():
                             self.writer.add_scalar("losses/td_loss", loss, global_step)
                             self.writer.add_scalar("losses/q_values", old_val.mean().item(), global_step)
                             if self.args.track:
-                                wandb.init(
-                                    project=self.args.wandb_project_name,
-                                    entity=self.args.wandb_entity,
-                                    sync_tensorboard=True,
-                                    config=self.args,
-                                    name=self.run_name,
-                                    save_code=True,
-                                )
+                                if not self.train_auto_fine_tune:
+                                    wandb.init(
+                                        project=self.args.wandb_project_name,
+                                        entity=self.args.wandb_entity,
+                                        sync_tensorboard=True,
+                                        config=self.args,
+                                        name=self.run_name,
+                                        save_code=True,
+                                    )
                                 wandb.log({'reward_curve': np.mean(self.sensor_dic['reward'][self.sensor_dic['Working_time'] == True])}, step=global_step)        
-                                wandb.log({'result_curve': np.mean(self.sensor_dic['result'][self.sensor_dic['Working_time'] == True])}, step=global_step)        
+                                wandb.log({'result_curve': Performance}, step=global_step)        
                                 wandb.log({'loss_curve': float(loss.cpu().detach().numpy())}, step=global_step)        
                                 # wandb.log({'epsilon_curve': float(epsilon)}, step=global_step)        
 
