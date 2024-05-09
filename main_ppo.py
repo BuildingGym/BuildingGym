@@ -360,6 +360,7 @@ class ppo():
                 # actions = torch.argmax(q_values, dim=0).cpu().numpy()
             com = 23. + actions
 
+            act = thinenv.act({'Thermostat': com})
 
             obs = pd.DataFrame(obs, index = [self.sensor_index])
             obs.insert(0, 'Time', t)
@@ -486,7 +487,7 @@ if __name__ == '__main__':
     sweep_config['metric'] = metric
     sweep_config['parameters'] = parameters_dict
 
-    # sweep_id = wandb.sweep(sweep_config, project="energygym-auto")
+    # sweep_id = wandb.sweep(sweep_config, project="energygym-ppo-auto")
     observation_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
     action_var = ['Thermostat']
     a = ppo(observation_var, action_var, False, sweep_config)
