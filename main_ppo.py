@@ -1,7 +1,7 @@
 from energyplus.ooep.addons.progress import ProgressProvider
 import asyncio
 import pandas as pd
-from rl.dqn.network import QNetwork
+from rl.ppo.network import Agent
 import random
 import numpy as np
 import time
@@ -9,7 +9,7 @@ from energyplus import ooep
 import torch.nn.functional as F
 import os
 from stable_baselines3.common.buffers import ReplayBuffer
-from rl.dqn.dqn_para import Args
+from rl.ppo.ppo_para import Args
 import wandb
 import tyro
 from torch.utils.tensorboard import SummaryWriter
@@ -132,7 +132,7 @@ simulator.add(
 
 
 
-class dqn():
+class ppo():
     def __init__(self, observation_var, action_var, auto_fine_tune = False, sweep_config = {}) -> None:
         self.observation_var = observation_var
         self.action_var = action_var
@@ -145,7 +145,7 @@ class dqn():
             "hyperparameters",
             "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(self.args).items()])))
         
-        self.q_network, self.target_network = self.set_network(self.args.input_dim, self.args.output_dim)
+        self.agent = self.set_network(self.args.input_dim, self.args.output_dim)
         self.optimizer = self.set_optimizer()
         simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
 
@@ -184,105 +184,132 @@ class dqn():
         start_time = time.time()
         for global_step in range(self.args.total_timesteps):
             # ALGO LOGIC: put action logic here
-            epsilon = self.linear_schedule(self.args.start_e, self.args.end_e, self.args.exploration_fraction * self.args.total_timesteps, global_step)
-            # if random.random() < epsilon:
-            #     actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
-            # else:
-            #     q_values = q_network(torch.Tensor(obs).to(device))
-            #     actions = torch.argmax(q_values, dim=1).cpu().numpy()
-
             self.epsilon = self.linear_schedule(self.args.start_e, self.args.end_e,
                                       self.args.exploration_fraction * self.args.total_timesteps,
                                       global_step)
             self.run()
             self.normalize_input()
-            # self.resample()
             self.label_working_time()
             self.cal_r()
             self.cal_return()
             # self.normalize_input()
-            Performance = np.mean(self.sensor_dic['result'][self.sensor_dic['Working_time'] == True])
+            Performance = np.mean(self.sensor_dic['results'][self.sensor_dic['Working_time'] == True])
             if  Performance>0.85:
                 path_i = os.path.join('Archive results', str(int(time.time())))
                 os.mkdir(path_i)
                 self.sensor_dic.to_csv(os.path.join(path_i, 'results.csv'))
-                torch.save(self.q_network.state_dict(), os.path.join(path_i, 'model.pth'))
-            for i in range(self.sensor_dic.shape[0]-1):
-                obs_i = self.sensor_dic[self.observation_var].iloc[i]
-                next_obs_i = self.sensor_dic[self.observation_var].iloc[i+1]
-                actions_i = self.sensor_dic[self.action_var].iloc[i]
-                rewards_i = self.sensor_dic['reward'].iloc[i]
-                if self.sensor_dic['Working_time'].iloc[i]:
-                    # To Do: too slow
-                    rb.add(np.array(obs_i),
-                        np.array(next_obs_i),
-                        np.array(actions_i),
-                        np.array(rewards_i),
-                        np.array([False]),
-                            '')
+                torch.save(self.agent.state_dict(), os.path.join(path_i, 'model.pth'))
+            buffer = {
+                'obs': self.sensor_dic[self.observation_var].iloc[0: self.sensor_dic.shape[0]-1],
+                'next_obs':self.sensor_dic[self.observation_var].iloc[1:self.sensor_dic.shape[0]],
+                'actions': self.sensor_dic[self.action_var].iloc[0: self.sensor_dic.shape[0]-1],
+                'rewards': self.sensor_dic['rewards'].iloc[0: self.sensor_dic.shape[0]-1],
+                'advantages':  self.sensor_dic['advantages'].iloc[0: self.sensor_dic.shape[0]-1],
+                'logprobs': self.sensor_dic['logprobs'].iloc[0: self.sensor_dic.shape[0]-1],
+                'values': self.sensor_dic['values'].iloc[0: self.sensor_dic.shape[0]-1],
+                'returns': self.sensor_dic['returns'].iloc[0: self.sensor_dic.shape[0]-1],
+                'Working_time': self.sensor_dic['Working_time'].iloc[0: self.sensor_dic.shape[0]-1],
+                'Terminations':  self.sensor_dic['Terminations'].iloc[0: self.sensor_dic.shape[0]-1]
+                }
+            # for i in range(self.sensor_dic.shape[0]-1):
+            #     obs_i = self.sensor_dic[self.observation_var].iloc[i]
+            #     next_obs_i = self.sensor_dic[self.observation_var].iloc[i+1]
+            #     actions_i = self.sensor_dic[self.action_var].iloc[i]
+            #     rewards_i = self.sensor_dic['rewards'].iloc[i]
+            #     advantages_i = self.sensor_dic['advantages'].iloc[i]
+            #     logprob_i = self.sensor_dic['logprobs'].iloc[i]
+            #     value_i = self.sensor_dic['values'].iloc[i]
+            #     return_i = self.sensor_dic['returns'].iloc[i]
+            #     if self.sensor_dic['Working_time'].iloc[i]:
+            #         # To Do: too slow
+            #         rb.add(np.array(obs_i),
+            #             np.array(next_obs_i),
+            #             np.array(actions_i),
+            #             np.array(rewards_i),
+            #             np.array([False]),
+            #                 {'advantages': advantages_i, 'logprobs':logprob_i, 'values': value_i, 'returns': return_i})
+            b_inds = np.arange(self.args.batch_size)
+            clipfracs = []
             if global_step >= self.args.learning_starts:
-                for k in range(1):
+                for k in range(self.args.update_epochs):
                     if global_step % self.args.train_frequency == 0:
-                        data = rb.sample(self.args.batch_size)
-                        with torch.no_grad():
-                            target_max, _ = self.target_network(data.next_observations).max(dim=1)
-                            td_target = data.rewards.flatten() + self.args.gamma * target_max
-                        old_val = self.q_network(data.observations).gather(1, data.actions).squeeze()
-                        loss = F.mse_loss(td_target, old_val)
+                        np.random.shuffle(b_inds)
+                        minibatch_size = int(self.args.batch_size/self.args.update_epochs)
+                        for start in range(0, self.args.batch_size, minibatch_size):
+                            end = start + minibatch_size
+                            mb_inds = b_inds[start:end]
+                            b_obs = torch.tensor(np.array(buffer['obs'])).to(self.device)
+                            b_actions = torch.tensor(np.array(buffer['actions'])).to(self.device)
+                            b_logprobs = torch.tensor(np.array(buffer['logprobs'])).to(self.device)
+                            b_advantages = torch.tensor(np.array(buffer['advantages'])).to(self.device)
+                            b_returns = torch.tensor(np.array(buffer['returns'])).to(self.device)
+                            b_values = torch.tensor(np.array(buffer['values'])).to(self.device)
+                            _, newlogprob, entropy, newvalue = self.agent.get_action_and_value(b_obs[mb_inds].float(), b_actions.float()[mb_inds])
+                            logratio = newlogprob - b_logprobs[mb_inds]
+                            ratio = logratio.exp()
 
-                        if global_step % 2 == 0:
-                            self.writer.add_scalar("losses/td_loss", loss, global_step)
-                            self.writer.add_scalar("losses/q_values", old_val.mean().item(), global_step)
-                            if self.args.track:
-                                if not self.train_auto_fine_tune:
-                                    wandb.init(
-                                        project=self.args.wandb_project_name,
-                                        entity=self.args.wandb_entity,
-                                        sync_tensorboard=True,
-                                        config=self.args,
-                                        name=self.run_name,
-                                        save_code=True,
-                                    )
-                                wandb.log({'reward_curve': np.mean(self.sensor_dic['reward'][self.sensor_dic['Working_time'] == True])}, step=global_step)        
-                                wandb.log({'result_curve': Performance}, step=global_step)        
-                                wandb.log({'loss_curve': float(loss.cpu().detach().numpy())}, step=global_step)        
-                                # wandb.log({'epsilon_curve': float(epsilon)}, step=global_step)        
+                            with torch.no_grad():
+                                # calculate approx_kl http://joschu.net/blog/kl-approx.html
+                                old_approx_kl = (-logratio).mean()
+                                approx_kl = ((ratio - 1) - logratio).mean()
+                                clipfracs += [((ratio - 1.0).abs() > self.args.clip_coef).float().mean().item()]
 
-                            print("SPS:", int(global_step / (time.time() - start_time)))
-                            self.writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
+                            mb_advantages = b_advantages[mb_inds]
+                            if self.args.norm_adv:
+                                mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
 
-                        # optimize the model
-                        self.optimizer.zero_grad()
-                        loss.backward()
-                        self.optimizer.step()
+                            # Policy loss
+                            pg_loss1 = -mb_advantages * ratio
+                            pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - self.args.clip_coef, 1 + self.args.clip_coef)
+                            pg_loss = torch.max(pg_loss1, pg_loss2).mean()
 
-                # update target network
-                if global_step % self.args.target_network_frequency == 0:
-                    for target_network_param, q_network_param in zip(self.target_network.parameters(), self.q_network.parameters()):
-                        target_network_param.data.copy_(
-                            self.args.tau * q_network_param.data + (1.0 - self.args.tau) * target_network_param.data
-                        )  
+                            # Value loss
+                            newvalue = newvalue.view(-1)
+                            if self.args.clip_vloss:
+                                v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
+                                v_clipped = b_values[mb_inds] + torch.clamp(
+                                    newvalue - b_values[mb_inds],
+                                    -self.args.clip_coef,
+                                    self.args.clip_coef,
+                                )
+                                v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
+                                v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
+                                v_loss = 0.5 * v_loss_max.mean()
+                            else:
+                                v_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
+
+                            entropy_loss = entropy.mean()
+                            loss = pg_loss - self.args.ent_coef * entropy_loss + v_loss * self.args.vf_coef
+
+                            self.optimizer.zero_grad()
+                            loss.backward()
+                            nn.utils.clip_grad_norm_(self.agent.parameters(), self.args.max_grad_norm)
+                            self.optimizer.step()
+
+                        if self.args.target_kl is not None and approx_kl > self.args.target_kl:
+                            break
+                    # TRY NOT TO MODIFY: record rewards for plotting purposes
+                y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
+                var_y = np.var(y_true)
+                explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y                    
+                self.writer.add_scalar("charts/learning_rate", self.optimizer.param_groups[0]["lr"], global_step)
+                self.writer.add_scalar("losses/value_loss", v_loss.item(), global_step)
+                self.writer.add_scalar("losses/policy_loss", pg_loss.item(), global_step)
+                self.writer.add_scalar("losses/entropy", entropy_loss.item(), global_step)
+                self.writer.add_scalar("losses/old_approx_kl", old_approx_kl.item(), global_step)
+                self.writer.add_scalar("losses/approx_kl", approx_kl.item(), global_step)
+                self.writer.add_scalar("losses/clipfrac", np.mean(clipfracs), global_step)
+                self.writer.add_scalar("losses/explained_variance", explained_var, global_step)
+                print("SPS:", int(global_step / (time.time() - start_time)))
+                self.writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
+
+        self.writer.close()                         
+
 
     def run(self):
         self.sensor_index = 0
         asyncio.run(energyplus_running('Large office - 1AV232.idf', 'USA_FL_Miami.722020_TMY2.epw'))
 
-                    
-    def resample(self):
-        month_start = self.sensor_dic['Time'][0].month
-        day_start = self.sensor_dic['Time'][0].day
-        year_start = self.sensor_dic['Time'][0].year
-        start = pd.to_datetime(str(year_start) + '-' + str(month_start) + '-' + str(day_start), format='%Y-%m-%d')
-        month_end = self.sensor_dic['Time'][self.sensor_dic.shape[0]-1].month
-        day_end = self.sensor_dic['Time'][self.sensor_dic.shape[0]-1].day
-        year_end = self.sensor_dic['Time'][self.sensor_dic.shape[0]-1].year
-        end = pd.to_datetime(str(year_end) + '-' + str(month_end) + '-' + str(day_end), format='%Y-%m-%d')
-        ts = pd.date_range(start=start, end=end, freq=str(int(60/self.args.n_time_step))+'min')
-        self.sensor_dic.index = self.sensor_dic['Time']
-        # TO DO: check resample results
-        ts_m = self.sensor_dic.resample('1min').interpolate(method='linear')
-        ts_m = ts_m.resample(str(int(60/self.args.n_time_step))+'min').asfreq()
-        self.sensor_dic = ts_m[1:]
 
     def call_track(self):
         pass
@@ -291,13 +318,14 @@ class dqn():
         nor_min = np.array([22.8, 22, 0, 0, 0])
         nor_max = np.array([33.3, 27, 1, 1, 1])
         nor_input = (self.sensor_dic[self.observation_var] - nor_min)/(nor_max - nor_min)
-        self.sensor_dic[self.observation_var] = nor_input        
-            
+        self.sensor_dic[self.observation_var] = nor_input     
+
     def normalize_input_i(self, state):
         nor_min = np.array([22.8, 22, 0, 0, 0])
         nor_max = np.array([33.3, 27, 1, 1, 1])
         return (state- nor_min)/(nor_max - nor_min)
-                
+            
+            
     def handler(self, __event):
         global thinenv
         try:
@@ -313,24 +341,17 @@ class dqn():
             state = [float(obs[i]) for i in self.observation_var]
             state = self.normalize_input_i(state)
             state = torch.Tensor(state).cuda() if torch.cuda.is_available() and self.args.cuda else torch.Tensor(state).cpu()
-            if random.random() < self.epsilon:
-                actions = random.sample(list(np.arange(0, self.args.output_dim)), 1)[0]
-            else:
-                q_values = self.q_network(state).to(self.device)  
-                actions = torch.argmax(q_values, dim=0).cpu().numpy()
+            with torch.no_grad():
+                actions, logprob, _, value = self.agent.get_action_and_value(state)
+                # actions = torch.argmax(q_values, dim=0).cpu().numpy()
             com = 23. + actions
 
-            act = thinenv.act({'Thermostat': com})
-            # act = thinenv.act({'Thermostat': 26})
-            # thinenv.act(
-            #     thinenv.action_space.sample()
-            # )
-            # t = simulator.variables.getdefault(
-            #     ooep.WallClock.Ref()
-            # ).value            
+
             obs = pd.DataFrame(obs, index = [self.sensor_index])
             obs.insert(0, 'Time', t)
-            obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', actions)
+            obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', actions.cpu().numpy())
+            obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().numpy())
+            obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value.flatten().cpu().numpy())
             if self.sensor_index == 0:
                 self.sensor_dic = pd.DataFrame({})
                 self.sensor_dic = obs
@@ -338,20 +359,12 @@ class dqn():
                 self.sensor_dic = pd.concat([self.sensor_dic, obs])            
             self.sensor_index+=1
 
-    # def to_tensor(self, obs):
-    #     value = []
-    #     for i in obs:
-    #         value.append(obs[i])
-    #     return torch.tensor(np.array(value))
-    
     def set_network(self, input_dim, output_dim):
-        q_network = QNetwork(self.args.input_dim, self.args.output_dim).to(self.device)
-        target_network = QNetwork(self.args.input_dim, self.args.output_dim).to(self.device)
-        target_network.load_state_dict(q_network.state_dict())
-        return q_network, target_network
+        agent = Agent(input_dim, output_dim).to(self.device)
+        return agent
     
     def set_optimizer(self):
-        optimizer = optim.Adam(self.q_network.parameters(), lr=self.args.learning_rate)
+        optimizer = optim.Adam(self.agent.parameters(), lr=self.args.learning_rate)
         return optimizer
     
     def control_fun(self, observation):
@@ -372,19 +385,26 @@ class dqn():
         start = pd.to_datetime(self.args.work_time_start, format='%H:%M')
         end = pd.to_datetime(self.args.work_time_end, format='%H:%M')
         # remove data without enough outlook step
-        dt = int(60/self.args.n_time_step) * self.args.outlook_step
+        dt = int(60/self.args.n_time_step)
         dt = pd.to_timedelta(dt, unit='min')
         end -= dt
         wt = [] # wt: working time label
+        terminations = [] # terminations: end of working time
         for i in range(int(self.sensor_dic.shape[0])):
             h = self.sensor_dic['Time'].iloc[i].hour
             m = self.sensor_dic['Time'].iloc[i].minute
             t = pd.to_datetime(str(h)+':'+str(m), format='%H:%M')
-            if t >= start and t <= end:
+            if t >= start and t < end:
                 wt.append(True)
+                terminations.append(False)
+                if t == end:
+                    wt.append(True)
+                    terminations.append(True)
             else:
                 wt.append(False)
+                terminations.append(False)
         self.sensor_dic['Working_time'] = wt
+        self.sensor_dic['Terminations'] = terminations
 
     def cal_r(self):
         baseline = pd.read_csv('Data\Day_mean.csv')
@@ -399,25 +419,26 @@ class dqn():
             result_i = round(1 - abs(energy_i - baseline_i)/baseline_i,1)
             reward.append(reward_i)
             result.append(result_i)            
-        self.sensor_dic['reward'] = reward
-        self.sensor_dic['result'] = result
+        self.sensor_dic['rewards'] = reward
+        self.sensor_dic['results'] = result
 
     def cal_return(self):
-        # Return return function (future accmulated reward)
-        R_list = []
-        for i in range(self.sensor_dic.shape[0] - self.args.outlook_step):
-            reward_list = self.sensor_dic['reward'][i:(i+ self.args.outlook_step)]
-            R = 0
-            for r in reward_list[::-1]:
-                R = r + R * self.args.gamma
-            R_list.append(R)
+        advantages = np.zeros(self.sensor_dic.shape[0])
+        for t in reversed(range(self.sensor_dic.shape[0]-1)):
+            with torch.no_grad():
+                lastgaelam = 0
+                nextnonterminal = 1.0 - self.sensor_dic['Terminations'].iloc[t + 1]
+                nextvalues = self.sensor_dic['values'].iloc[t+1].reshape(1, -1)
+                delta = self.sensor_dic['rewards'].iloc[t] + self.args.gamma * nextvalues * nextnonterminal - self.sensor_dic['values'].iloc[t]
+                delta = delta[0][0]
+                lastgaelam = delta + self.args.gamma * self.args.gae_lambda * nextnonterminal * lastgaelam
+                advantages[t] = delta + self.args.gamma * self.args.gae_lambda * nextnonterminal * lastgaelam
+        returns = advantages + self.sensor_dic['values']
+        self.sensor_dic['returns'] = returns
+        self.sensor_dic['advantages'] = advantages
+        self.sensor_dic = self.sensor_dic[:-1]
         
-        # Remove data without enough outlook steps
-        self.sensor_dic = self.sensor_dic[:-self.args.outlook_step]
-        # if myidf.control:
-        #     myidf.cmd_dic = myidf.cmd_dic[:-self.args.outlook_step]
-            # append Return data
-        self.sensor_dic['Return'] = R_list        
+      
 
 if __name__ == '__main__':
     default_paras = tyro.cli(Args)
@@ -451,9 +472,9 @@ if __name__ == '__main__':
     sweep_config['metric'] = metric
     sweep_config['parameters'] = parameters_dict
 
-    sweep_id = wandb.sweep(sweep_config, project="energygym-auto")
+    # sweep_id = wandb.sweep(sweep_config, project="energygym-auto")
     observation_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
     action_var = ['Thermostat']
-    a = dqn(observation_var, action_var, True, sweep_config)
-    wandb.agent(sweep_id, a.train_auto_fine_tune, count=20) 
-    # a.train()
+    a = ppo(observation_var, action_var, True, sweep_config)
+    # wandb.agent(sweep_id, a.train_auto_fine_tune, count=20) 
+    a.train()
