@@ -135,6 +135,7 @@ simulator.add(
 class dqn():
     def __init__(self, observation_var, action_var, auto_fine_tune = False, sweep_config = {}) -> None:
         self.observation_var = observation_var
+        self.auto_fine_tune = auto_fine_tune
         self.action_var = action_var
         self.sweep_config = sweep_config
         self.args = tyro.cli(Args)
@@ -234,7 +235,7 @@ class dqn():
                             self.writer.add_scalar("losses/td_loss", loss, global_step)
                             self.writer.add_scalar("losses/q_values", old_val.mean().item(), global_step)
                             if self.args.track:
-                                if not self.train_auto_fine_tune:
+                                if not self.auto_fine_tune:
                                     wandb.init(
                                         project=self.args.wandb_project_name,
                                         entity=self.args.wandb_entity,

@@ -137,6 +137,7 @@ class ppo():
         self.observation_var = observation_var
         self.action_var = action_var
         self.sweep_config = sweep_config
+        self.auto_fine_tune = auto_fine_tune
         self.args = tyro.cli(Args)
         self.run_name = f"{self.args.env_id}__{self.args.exp_name}__{self.args.seed}__{int(time.time())}"
         self.device = torch.device("cuda" if torch.cuda.is_available() and self.args.cuda else "cpu")
@@ -291,7 +292,20 @@ class ppo():
                     # TRY NOT TO MODIFY: record rewards for plotting purposes
                 y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
                 var_y = np.var(y_true)
-                explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y                    
+                explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y      
+                if self.args.track:
+                    if not self.auto_fine_tune:
+                        wandb.init(
+                            project=self.args.wandb_project_name,
+                            entity=self.args.wandb_entity,
+                            sync_tensorboard=True,
+                            config=self.args,
+                            name=self.run_name,
+                            save_code=True,
+                        )
+                        wandb.log({'reward_curve': np.mean(self.sensor_dic['rewards'][self.sensor_dic['Working_time'] == True])}, step=global_step)        
+                        wandb.log({'result_curve': Performance}, step=global_step)        
+                        wandb.log({'loss_curve': float(loss.cpu().detach().numpy())}, step=global_step)                                                     
                 self.writer.add_scalar("charts/learning_rate", self.optimizer.param_groups[0]["lr"], global_step)
                 self.writer.add_scalar("losses/value_loss", v_loss.item(), global_step)
                 self.writer.add_scalar("losses/policy_loss", pg_loss.item(), global_step)
@@ -475,6 +489,6 @@ if __name__ == '__main__':
     # sweep_id = wandb.sweep(sweep_config, project="energygym-auto")
     observation_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
     action_var = ['Thermostat']
-    a = ppo(observation_var, action_var, True, sweep_config)
+    a = ppo(observation_var, action_var, False, sweep_config)
     # wandb.agent(sweep_id, a.train_auto_fine_tune, count=20) 
     a.train()
