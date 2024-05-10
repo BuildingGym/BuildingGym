@@ -29,10 +29,12 @@ class Args:
     """the id of the environment"""
     output_dim: int = 5
     """the id of the environment"""         
-    learning_rate: float = 2.5e-4
+    learning_rate: float = 2.5e-2
     """the learning rate of the optimizer"""
     buffer_size: int = 1000
     """the replay memory buffer size"""
+    minibatch_size: int = 64
+    """the minibatch size"""    
     num_steps: int = 128
     """the number of steps to run in each environment per policy rollout"""
     start_e: float = 0.5
@@ -73,8 +75,8 @@ class Args:
     """the number of steps in one hour"""
     outlook_step: int = 6
     """the number of steps to outlook for accumulate rewards"""    
-    batch_size: int = 64
-    """the batch size (computed in runtime)"""
+    # batch_size: int = 64
+    # """the batch size (computed in runtime)"""
     learning_starts: int = 1
     """the batch size (computed in runtime)"""    
     train_frequency: int = 1

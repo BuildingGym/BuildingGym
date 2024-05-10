@@ -195,7 +195,7 @@ class ppo():
             self.cal_return()
             # self.normalize_input()
             Performance = np.mean(self.sensor_dic['results'][self.sensor_dic['Working_time'] == True])
-            if  Performance>0.85:
+            if  Performance>0.88:
                 path_i = os.path.join('Archive results', str(int(time.time())))
                 os.mkdir(path_i)
                 self.sensor_dic.to_csv(os.path.join(path_i, 'results.csv'))
@@ -229,14 +229,16 @@ class ppo():
             #             np.array(rewards_i),
             #             np.array([False]),
             #                 {'advantages': advantages_i, 'logprobs':logprob_i, 'values': value_i, 'returns': return_i})
-            b_inds = np.arange(self.args.batch_size)
+            batch_size = int(self.sensor_dic.shape[0]/self.args.minibatch_size) * self.args.minibatch_size
+            # n_minibatch = int(self.sensor_dic.shape[0]/self.args.minibatch_size)
+            b_inds = np.arange(batch_size)
             clipfracs = []
             if global_step >= self.args.learning_starts:
                 for k in range(self.args.update_epochs):
                     if global_step % self.args.train_frequency == 0:
                         np.random.shuffle(b_inds)
-                        minibatch_size = int(self.args.batch_size/self.args.update_epochs)
-                        for start in range(0, self.args.batch_size, minibatch_size):
+                        minibatch_size = self.args.minibatch_size
+                        for start in range(0, batch_size, minibatch_size):
                             end = start + minibatch_size
                             mb_inds = b_inds[start:end]
                             b_obs = torch.tensor(np.array(buffer['obs'])).to(self.device)
@@ -461,21 +463,21 @@ if __name__ == '__main__':
     'learning_rate': {
         'values': [1e-2, 1e-3, 1e-4]
         },
-    'batch_size': {
+    'minibatch_size': {
           'values': [32, 64, 128]
         },
-    'tau': {
-          'values': [0.9, 0.8]
+    'update_epochs': {
+          'values': [1, 4, 10]
         },     
-    'start_e': {
-          'values': [0.8, 0.5, 0.2]
-        },     
-    'train_frequency': {
-          'values': [1, 5, 10]
-        },   
-    'target_network_frequency': {
-          'values': [5, 20, 30]
-        },                                
+    # 'start_e': {
+    #       'values': [0.8, 0.5, 0.2]
+    #     },     
+    # 'train_frequency': {
+    #       'values': [1, 5, 10]
+    #     },   
+    # 'target_network_frequency': {
+    #       'values': [5, 20, 30]
+    #     },                                
     }
     sweep_config = {
     'method': 'random'
@@ -487,9 +489,9 @@ if __name__ == '__main__':
     sweep_config['metric'] = metric
     sweep_config['parameters'] = parameters_dict
 
-    # sweep_id = wandb.sweep(sweep_config, project="energygym-ppo-auto")
+    sweep_id = wandb.sweep(sweep_config, project="energygym-ppo-auto")
     observation_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
     action_var = ['Thermostat']
-    a = ppo(observation_var, action_var, False, sweep_config)
-    # wandb.agent(sweep_id, a.train_auto_fine_tune, count=20) 
-    a.train()
+    a = ppo(observation_var, action_var, True, sweep_config)
+    wandb.agent(sweep_id, a.train_auto_fine_tune, count=6) 
+    # a.train()
