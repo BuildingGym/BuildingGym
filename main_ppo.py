@@ -462,7 +462,7 @@ if __name__ == '__main__':
     default_paras = tyro.cli(Args)
     parameters_dict = {
     'learning_rate': {
-        'values': [1e-2, 1e-3, 1e-4]
+        'values': [1e-2]
         },
     'minibatch_size': {
           'values': [32, 64, 128]
