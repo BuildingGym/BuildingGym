@@ -305,9 +305,9 @@ class ppo():
                             name=self.run_name,
                             save_code=True,
                         )
-                        wandb.log({'reward_curve': np.mean(self.sensor_dic['rewards'][self.sensor_dic['Working_time'] == True])}, step=global_step)        
-                        wandb.log({'result_curve': Performance}, step=global_step)        
-                        wandb.log({'loss_curve': float(loss.cpu().detach().numpy())}, step=global_step)                                                     
+                    wandb.log({'reward_curve': np.mean(self.sensor_dic['rewards'][self.sensor_dic['Working_time'] == True])}, step=global_step)        
+                    wandb.log({'result_curve': Performance}, step=global_step)        
+                    wandb.log({'loss_curve': float(loss.cpu().detach().numpy())}, step=global_step)                                                     
                 self.writer.add_scalar("charts/learning_rate", self.optimizer.param_groups[0]["lr"], global_step)
                 self.writer.add_scalar("losses/value_loss", v_loss.item(), global_step)
                 self.writer.add_scalar("losses/policy_loss", pg_loss.item(), global_step)
