@@ -201,16 +201,16 @@ class ppo():
                 self.sensor_dic.to_csv(os.path.join(path_i, 'results.csv'))
                 torch.save(self.agent.state_dict(), os.path.join(path_i, 'model.pth'))
             buffer = {
-                'obs': self.sensor_dic[self.observation_var].iloc[0: self.sensor_dic.shape[0]-1],
-                'next_obs':self.sensor_dic[self.observation_var].iloc[1:self.sensor_dic.shape[0]],
-                'actions': self.sensor_dic[self.action_var].iloc[0: self.sensor_dic.shape[0]-1],
-                'rewards': self.sensor_dic['rewards'].iloc[0: self.sensor_dic.shape[0]-1],
-                'advantages':  self.sensor_dic['advantages'].iloc[0: self.sensor_dic.shape[0]-1],
-                'logprobs': self.sensor_dic['logprobs'].iloc[0: self.sensor_dic.shape[0]-1],
-                'values': self.sensor_dic['values'].iloc[0: self.sensor_dic.shape[0]-1],
-                'returns': self.sensor_dic['returns'].iloc[0: self.sensor_dic.shape[0]-1],
-                'Working_time': self.sensor_dic['Working_time'].iloc[0: self.sensor_dic.shape[0]-1],
-                'Terminations':  self.sensor_dic['Terminations'].iloc[0: self.sensor_dic.shape[0]-1]
+                'obs': self.sensor_dic[self.observation_var].iloc[np.where(self.sensor_dic['Working_time']==True)[0]],
+                'next_obs':self.sensor_dic[self.observation_var].iloc[np.where(self.sensor_dic['Working_time']==True)[0]+1],
+                'actions': self.sensor_dic[self.action_var].iloc[np.where(self.sensor_dic['Working_time']==True)[0]],
+                'rewards': self.sensor_dic['rewards'].iloc[np.where(self.sensor_dic['Working_time']==True)[0]],
+                'advantages':  self.sensor_dic['advantages'].iloc[np.where(self.sensor_dic['Working_time']==True)[0]],
+                'logprobs': self.sensor_dic['logprobs'].iloc[np.where(self.sensor_dic['Working_time']==True)[0]],
+                'values': self.sensor_dic['values'].iloc[np.where(self.sensor_dic['Working_time']==True)[0]],
+                'returns': self.sensor_dic['returns'].iloc[np.where(self.sensor_dic['Working_time']==True)[0]],
+                'Working_time': self.sensor_dic['Working_time'].iloc[np.where(self.sensor_dic['Working_time']==True)[0]],
+                'Terminations':  self.sensor_dic['Terminations'].iloc[np.where(self.sensor_dic['Working_time']==True)[0]]
                 }
             # for i in range(self.sensor_dic.shape[0]-1):
             #     obs_i = self.sensor_dic[self.observation_var].iloc[i]
@@ -229,7 +229,7 @@ class ppo():
             #             np.array(rewards_i),
             #             np.array([False]),
             #                 {'advantages': advantages_i, 'logprobs':logprob_i, 'values': value_i, 'returns': return_i})
-            batch_size = int(self.sensor_dic.shape[0]/self.args.minibatch_size) * self.args.minibatch_size
+            batch_size = int(np.sum(self.sensor_dic['Working_time'])/self.args.minibatch_size) * self.args.minibatch_size
             # n_minibatch = int(self.sensor_dic.shape[0]/self.args.minibatch_size)
             b_inds = np.arange(batch_size)
             clipfracs = []
@@ -238,7 +238,8 @@ class ppo():
                     if global_step % self.args.train_frequency == 0:
                         np.random.shuffle(b_inds)
                         minibatch_size = self.args.minibatch_size
-                        for start in range(0, batch_size, minibatch_size):
+                        # for start in range(0, batch_size, minibatch_size):
+                        for start in range(0, 1):
                             end = start + minibatch_size
                             mb_inds = b_inds[start:end]
                             b_obs = torch.tensor(np.array(buffer['obs'])).to(self.device)
@@ -467,7 +468,7 @@ if __name__ == '__main__':
           'values': [32, 64, 128]
         },
     'update_epochs': {
-          'values': [1, 4, 10]
+          'values': [1]
         },     
     # 'start_e': {
     #       'values': [0.8, 0.5, 0.2]
