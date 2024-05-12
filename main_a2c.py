@@ -40,6 +40,8 @@ from energyplus.ooep.addons.rl.gymnasium import ThinEnv
 from energyplus.dataset.basic import dataset as _epds_
 import torch.nn as nn
 import wandb
+from rl.a2c.a2c_policy import ActorCriticPolicy
+from rl.util.schedule import ConstantSchedule
 
 simulator = Simulator().add(
     ProgressProvider(),
@@ -132,7 +134,7 @@ simulator.add(
 
 
 
-class ppo():
+class a2c():
     def __init__(self, observation_var, action_var, auto_fine_tune = False, sweep_config = {}) -> None:
         self.observation_var = observation_var
         self.action_var = action_var

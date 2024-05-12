@@ -55,15 +55,15 @@ class Args:
     """the K epochs to update the policy"""
     norm_adv: bool = True
     """Toggles advantages normalization"""
-    clip_coef: float = 0.2
+    clip_coef: float = 2
     """the surrogate clipping coefficient"""
-    clip_vloss: bool = True
+    clip_vloss: bool = False
     """Toggles whether or not to use a clipped loss for the value function, as per the paper."""
-    ent_coef: float = 0.01
+    ent_coef: float = 0.1
     """coefficient of the entropy"""
-    vf_coef: float = 0.5
+    vf_coef: float = 1
     """coefficient of the value function"""
-    max_grad_norm: float = 0.5
+    max_grad_norm: float = 10
     """the maximum norm for the gradient clipping"""
     target_kl: float = None
     """the target KL divergence threshold"""
