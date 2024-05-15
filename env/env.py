@@ -126,12 +126,11 @@ class buildinggym_env():
             t = pd.to_datetime(str(h)+':'+str(m), format='%H:%M')
             if t >= start and t < end:
                 wt.append(True)
-                terminations.append(False)
-                if t == end:
-                    wt.append(True)
-                    terminations.append(True)
             else:
                 wt.append(False)
+            if t >= end:
+                terminations.append(True)
+            else:
                 terminations.append(False)
         self.sensor_dic['Working_time'] = wt
         self.sensor_dic['Terminations'] = terminations    
@@ -145,7 +144,7 @@ class buildinggym_env():
             energy_i = self.sensor_dic['Chiller Electricity Rate'].iloc[j]
             k = j % (24*self.args.n_time_step)
             baseline_i = baseline['Day_mean'].iloc[k]
-            reward_i = 10 - 10*(abs(energy_i ** 2 - baseline_i ** 2)/baseline_i ** 2) ** 2
+            reward_i = max(0.3 - 1*(abs(energy_i ** 2 - baseline_i ** 2)/baseline_i ** 2), -1)
             result_i = round(1 - abs(energy_i - baseline_i)/baseline_i,1)
             reward.append(reward_i)
             result.append(result_i)          

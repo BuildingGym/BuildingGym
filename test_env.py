@@ -123,15 +123,15 @@ run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 
 a = A2C(ActorCriticPolicy, env, Args, my_callback)
 
-wandb.init(
-    project=args.wandb_project_name,
-    entity=args.wandb_entity,
-    sync_tensorboard=True,
-    config=args,
-    name=run_name,
-    save_code=False,
-)
-_, performance = a.learn(args.total_epoch, my_callback)
+# wandb.init(
+#     project=args.wandb_project_name,
+#     entity=args.wandb_entity,
+#     sync_tensorboard=True,
+#     config=args,
+#     name=run_name,
+#     save_code=False,
+# )
+# _, performance = a.learn(args.total_epoch, my_callback)
 
 
 
@@ -139,21 +139,21 @@ parameters_dict = {
 'learning_rate': {
     'values': [1e-2, 1e-4, 1e-6]
     },
-'train_perEp': {
-        'values': [1, 10, 100]
+'max_train_perEp': {
+        'values': [1, 100, 1000]
     },  
 'gamma': {
         'values': [0.9, 0.8, 0.5]
     },         
-# 'start_e': {
-#       'values': [0.8, 0.5, 0.2]
-#     },     
+'n_steps': {
+      'values': [3, 5, 8]
+    },     
 # 'train_frequency': {
 #       'values': [1, 5, 10]
 #     },   
-# 'target_network_frequency': {
-#       'values': [5, 20, 30]
-#     },                                
+'gae_lambda': {
+      'values': [0.9, 0.5]
+    },                                
 }
 sweep_config = {
 'method': 'random'
@@ -165,8 +165,8 @@ metric = {
 sweep_config['metric'] = metric
 sweep_config['parameters'] = parameters_dict
 
-# sweep_id = wandb.sweep(sweep_config, project="a2c-auto")
+sweep_id = wandb.sweep(sweep_config, project="a2c-auto")
 
-# wandb.agent(sweep_id, a.train_auto_fine_tune, count=6) 
+wandb.agent(sweep_id, a.train_auto_fine_tune, count=16) 
 
 dxl = 'success'

@@ -7,7 +7,7 @@ import torch as th
 from gymnasium import spaces
 
 from rl.util.base_class import BaseAlgorithm
-from stable_baselines3.common.buffers import DictRolloutBuffer, RolloutBuffer
+from rl.util.buffers import DictRolloutBuffer, RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
@@ -138,6 +138,18 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             self.observation_space, self.action_space, self.lr_schedule, use_sde=self.use_sde, **self.policy_kwargs
         )
         self.policy = self.policy.to(self.device)
+    
+    def reset_buffer(self, new_batch_size):
+        self.rollout_buffer = self.rollout_buffer_class(
+            new_batch_size,
+            self.observation_space,  # type: ignore[arg-type]
+            self.action_space,
+            device=self.device,
+            gamma=self.gamma,
+            gae_lambda=self.gae_lambda,
+            n_envs=self.n_envs,
+            **self.rollout_buffer_kwargs,
+        )        
 
     def collect_rollouts(
         self,
@@ -164,7 +176,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         self.policy.set_training_mode(False)
 
         n_steps = 0
-        rollout_buffer.reset()
+        # rollout_buffer.reset()
         # Sample new weights for the state dependent exploration
         if self.use_sde:
             self.policy.reset_noise(env.num_envs)
@@ -184,6 +196,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             # env.cal_return()
 
             self.data_wt = env.sensor_dic.iloc[np.where(env.sensor_dic['Working_time'])[0]]
+            rollout_buffer.reset(self.data_wt.shape[0])
 
             assert self.batch_size<env.sensor_dic.shape[0], f'Batch size should samller than {self.data_wt.shape[0]}'
 
@@ -193,11 +206,11 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             _rewards = np.array(self.data_wt['rewards'])
             performance = np.mean(self.data_wt['results'])
 
-            index = random.randint(0, _obs.shape[0]-self.batch_size-1)
+            # index = random.randint(0, _obs.shape[0]-self.batch_size-1)
 
-            _terminal_state = _terminal_state[index:index+self.batch_size]
-            _obs = _obs[index:index+self.batch_size,:]
-            _rewards = _rewards[index:index+self.batch_size]
+            # _terminal_state = _terminal_state[index:index+self.batch_size]
+            # _obs = _obs[index:index+self.batch_size,:]
+            # _rewards = _rewards[index:index+self.batch_size]
             with th.no_grad():
                 # Convert to pytorch tensor or to TensorDict
                 obs_tensor = obs_as_tensor(_obs, self.device)
@@ -241,7 +254,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
                     # and infos[idx].get("terminal_observation") is not None
                     # and infos[idx].get("TimeLimit.truncated", False)
                 ):
-                    terminal_obs = self.policy.obs_to_tensor(_obs[idx]["terminal_observation"])[0]
+                    terminal_obs = torch.tensor(_obs[idx]).to('cuda').unsqueeze(0)
                     with th.no_grad():
                         terminal_value = self.policy.predict_values(terminal_obs)[0]  # type: ignore[arg-type]
                     _rewards[idx] += self.gamma * terminal_value
@@ -263,8 +276,8 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             # Compute value for the last timestep
             last_values = self.policy.predict_values(torch.tensor(self._last_obs).to('cuda').unsqueeze(0))
 
-
-        rollout_buffer.compute_returns_and_advantage(last_values=last_values, dones=_terminal_state[k])
+        rollout_buffer.remove_tail(n_rollout_steps)
+        rollout_buffer.compute_returns_and_advantage_seg(last_values=last_values, dones=_terminal_state[k], step_length = n_rollout_steps)
 
         callback.update_locals(locals())
 
@@ -272,7 +285,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
 
         return True, performance
 
-    def train(self) -> None:
+    def train(self, max_train_perEp = np.inf) -> None:
         """
         Consume current rollout data and update policy parameters.
         Implemented by individual algorithms.
@@ -309,7 +322,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         tb_log_name: str = "OnPolicyAlgorithm",
         reset_num_timesteps: bool = True,
         progress_bar: bool = False,
-        train_perEp: int = 10
+        max_train_perEp: int = 10
     ) -> SelfOnPolicyAlgorithm:
         iteration = 0
 
@@ -338,8 +351,8 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             if log_interval is not None and iteration % log_interval == 0:
                 assert self.ep_info_buffer is not None
                 self._dump_logs(iteration)
-            for i in range(train_perEp):
-                self.env.p_loss, self.env.v_loss, self.env.prob = self.train()
+
+            self.env.p_loss, self.env.v_loss, self.env.prob = self.train(max_train_perEp)
 
         callback.on_training_end()
 

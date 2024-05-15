@@ -138,7 +138,7 @@ class A2C(OnPolicyAlgorithm):
         if _init_setup_model:
             self._setup_model()
 
-    def train(self) -> None:
+    def train(self, max_train_perEp = np.inf) -> None:
         """
         Update policy using the currently gathered
         rollout buffer (one gradient step over whole data).
@@ -150,8 +150,10 @@ class A2C(OnPolicyAlgorithm):
         self._update_learning_rate(self.policy.optimizer)
 
         # This will only loop once (get all data in one go)
-        for rollout_data in self.rollout_buffer.get(batch_size=None):
-
+        for rollout_data in self.rollout_buffer.get(batch_size=self.batch_size):
+            n_train = 0
+            if n_train >= max_train_perEp:
+                break
             actions = rollout_data.actions
             if isinstance(self.action_space, spaces.Discrete):
                 # Convert discrete action from float to long
@@ -187,6 +189,7 @@ class A2C(OnPolicyAlgorithm):
             # Clip grad norm
             th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
             self.policy.optimizer.step()
+            n_train+=1
 
         explained_var = explained_variance(self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten())
 
@@ -209,6 +212,7 @@ class A2C(OnPolicyAlgorithm):
         tb_log_name: str = "A2C",
         reset_num_timesteps: bool = False,
         progress_bar: bool = False,
+        max_train_perEp: int = 100,
     ) -> SelfA2C:
         _, performance =  super().learn(
             total_timesteps=total_timesteps,
@@ -217,7 +221,7 @@ class A2C(OnPolicyAlgorithm):
             tb_log_name=tb_log_name,
             reset_num_timesteps=reset_num_timesteps,
             progress_bar=progress_bar,
-            train_perEp=self.args.train_perEp
+            max_train_perEp=max_train_perEp
         )
         return performance
     
@@ -235,4 +239,4 @@ class A2C(OnPolicyAlgorithm):
             for k, v in tyro.cli(Args).__dict__.items():
                 if k not in self.args:
                     self.args[str(k)] = v
-            self.learn(self.args.total_epoch, self.my_callback)
+            self.learn(self.args.total_epoch, self.my_callback, max_train_perEp = self.args.max_train_perEp)
