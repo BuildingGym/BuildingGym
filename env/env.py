@@ -92,7 +92,9 @@ class buildinggym_env():
 
     def normalize_input(self, data=None):
         nor_min = np.array([22.8, 22, 0, 0, 0])
+        # nor_min = np.array([0, 0, 0, 0, 0])
         nor_max = np.array([33.3, 27, 1, 1, 1])
+        # nor_max = np.array([1, 1, 1, 1, 1])
         if data == None:
             data = self.sensor_dic[self.observation_var]
         nor_input = (data - nor_min)/(nor_max - nor_min)
@@ -104,7 +106,9 @@ class buildinggym_env():
 
     def normalize_input_i(self, state):
         nor_min = np.array([22.8, 22, 0, 0, 0])
+        # nor_min = np.array([0, 0, 0, 0, 0])
         nor_max = np.array([33.3, 27, 1, 1, 1])
+        # nor_max = np.array([1, 1, 1, 1, 1])
         return (state- nor_min)/(nor_max - nor_min)
     
     def label_working_time(self):
@@ -141,28 +145,31 @@ class buildinggym_env():
             energy_i = self.sensor_dic['Chiller Electricity Rate'].iloc[j]
             k = j % (24*self.args.n_time_step)
             baseline_i = baseline['Day_mean'].iloc[k]
-            reward_i = round(0.3 - abs(energy_i ** 2 - baseline_i ** 2)/baseline_i ** 2,1)
+            reward_i = 10 - 10*(abs(energy_i ** 2 - baseline_i ** 2)/baseline_i ** 2) ** 2
             result_i = round(1 - abs(energy_i - baseline_i)/baseline_i,1)
             reward.append(reward_i)
-            result.append(result_i)            
+            result.append(result_i)          
+        reward = reward[1:]
+        result = result[1:]
+        self.sensor_dic =  self.sensor_dic[0:-1]
         self.sensor_dic['rewards'] = reward
-        self.sensor_dic['results'] = result 
+        self.sensor_dic['results'] = result
 
-    def cal_return(self):
-        advantages = np.zeros(self.sensor_dic.shape[0])
-        for t in reversed(range(self.sensor_dic.shape[0]-1)):
-            with torch.no_grad():
-                lastgaelam = 0
-                nextnonterminal = 1.0 - self.sensor_dic['Terminations'].iloc[t + 1]
-                nextvalues = self.sensor_dic['values'].iloc[t+1].reshape(1, -1)
-                delta = self.sensor_dic['rewards'].iloc[t] + self.args.gamma * nextvalues * nextnonterminal - self.sensor_dic['values'].iloc[t]
-                delta = delta[0][0]
-                lastgaelam = delta + self.args.gamma * self.args.gae_lambda * nextnonterminal * lastgaelam
-                advantages[t] = delta + self.args.gamma * self.args.gae_lambda * nextnonterminal * lastgaelam
-        returns = advantages + self.sensor_dic['values']
-        self.sensor_dic['returns'] = returns
-        self.sensor_dic['advantages'] = advantages
-        self.sensor_dic = self.sensor_dic[:-1]
+    # def cal_return(self):
+    #     advantages = np.zeros(self.sensor_dic.shape[0])
+    #     for t in reversed(range(self.sensor_dic.shape[0]-1)):
+    #         with torch.no_grad():
+    #             lastgaelam = 0
+    #             nextnonterminal = 1.0 - self.sensor_dic['Terminations'].iloc[t + 1]
+    #             nextvalues = self.sensor_dic['values'].iloc[t+1].reshape(1, -1)
+    #             delta = self.sensor_dic['rewards'].iloc[t] + self.args.gamma * nextvalues * nextnonterminal - self.sensor_dic['values'].iloc[t]
+    #             delta = delta[0][0]
+    #             lastgaelam = delta + self.args.gamma * self.args.gae_lambda * nextnonterminal * lastgaelam
+    #             advantages[t] = delta + self.args.gamma * self.args.gae_lambda * nextnonterminal * lastgaelam
+    #     returns = advantages + self.sensor_dic['values']
+    #     self.sensor_dic['returns'] = returns
+    #     self.sensor_dic['advantages'] = advantages
+    #     self.sensor_dic = self.sensor_dic[:-1]
 
     def handler(self, __event):
         global thinenv
@@ -188,7 +195,7 @@ class buildinggym_env():
             
             obs = pd.DataFrame(obs, index = [self.sensor_index])
             obs.insert(0, 'Time', t)
-            # obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', actions.cpu().numpy())
+            obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', com)
             # obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().numpy())
             # obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value.flatten().cpu().numpy())
             # obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', 1)

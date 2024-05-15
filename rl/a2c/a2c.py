@@ -1,15 +1,17 @@
 from typing import Any, ClassVar, Dict, Optional, Type, TypeVar, Union
-
+from rl.a2c.a2c_para import Args
 import torch as th
 from gymnasium import spaces
 from torch.nn import functional as F
-
+import tyro
 from stable_baselines3.common.buffers import RolloutBuffer
 from rl.util.onpolicyalgo import OnPolicyAlgorithm
 from stable_baselines3.common.policies import ActorCriticCnnPolicy, ActorCriticPolicy, BasePolicy, MultiInputActorCriticPolicy
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
 from stable_baselines3.common.utils import explained_variance
 from env.env import buildinggym_env
+import numpy as np
+import wandb
 
 SelfA2C = TypeVar("SelfA2C", bound="A2C")
 
@@ -68,13 +70,15 @@ class A2C(OnPolicyAlgorithm):
         self,
         policy: Union[str, Type[ActorCriticPolicy]],
         env: buildinggym_env,
-        learning_rate: Union[float, Schedule] = 7e-4,
+        args: Args,
+        my_callback = None,
+        learning_rate: Union[float, Schedule] = 1e-4,
         n_steps: int = 5,
-        gamma: float = 0.99,
+        gamma: float = 0.9,
         gae_lambda: float = 1.0,
-        ent_coef: float = 0.0,
+        ent_coef: float = 0,
         vf_coef: float = 0.5,
-        max_grad_norm: float = 0.5,
+        max_grad_norm: float = 10,
         rms_prop_eps: float = 1e-5,
         use_rms_prop: bool = True,
         use_sde: bool = False,
@@ -90,18 +94,21 @@ class A2C(OnPolicyAlgorithm):
         device: Union[th.device, str] = "auto",
         _init_setup_model: bool = True,
     ):
+        self.args = tyro.cli(Args)
+        self.my_callback = my_callback
+        self.sweep_config = self.args
         super().__init__(
             policy,
             env,
-            learning_rate=learning_rate,
-            n_steps=n_steps,
-            gamma=gamma,
-            gae_lambda=gae_lambda,
-            ent_coef=ent_coef,
-            vf_coef=vf_coef,
-            max_grad_norm=max_grad_norm,
-            use_sde=use_sde,
-            sde_sample_freq=sde_sample_freq,
+            learning_rate=self.args.learning_rate,
+            n_steps=self.args.n_steps,
+            gamma=self.args.gamma,
+            gae_lambda=self.args.gae_lambda,
+            ent_coef=self.args.ent_coef,
+            vf_coef=self.args.vf_coef,
+            max_grad_norm=self.args.max_grad_norm,
+            use_sde=self.args.use_sde,
+            sde_sample_freq=self.args.sde_sample_freq,
             rollout_buffer_class=rollout_buffer_class,
             rollout_buffer_kwargs=rollout_buffer_kwargs,
             stats_window_size=stats_window_size,
@@ -171,7 +178,7 @@ class A2C(OnPolicyAlgorithm):
             else:
                 entropy_loss = -th.mean(entropy)
 
-            loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
+            loss = self.args.pol_coef * policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
 
             # Optimization step
             self.policy.optimizer.zero_grad()
@@ -191,21 +198,41 @@ class A2C(OnPolicyAlgorithm):
         self.logger.record("train/value_loss", value_loss.item())
         if hasattr(self.policy, "log_std"):
             self.logger.record("train/std", th.exp(self.policy.log_std).mean().item())
+        return policy_loss.item(), value_loss.item(), np.mean(np.array(log_prob.detach().cpu()))
+
 
     def learn(
         self: SelfA2C,
         total_timesteps: int,
         callback: MaybeCallback = None,
-        log_interval: int = 100,
+        log_interval: int = 10,
         tb_log_name: str = "A2C",
         reset_num_timesteps: bool = False,
         progress_bar: bool = False,
     ) -> SelfA2C:
-        return super().learn(
+        _, performance =  super().learn(
             total_timesteps=total_timesteps,
             callback=callback,
             log_interval=log_interval,
             tb_log_name=tb_log_name,
             reset_num_timesteps=reset_num_timesteps,
             progress_bar=progress_bar,
+            train_perEp=self.args.train_perEp
         )
+        return performance
+    
+    def train_auto_fine_tune(self,
+                             ):
+        with wandb.init(
+                project=self.args.wandb_project_name,
+                entity=self.args.wandb_entity,
+                sync_tensorboard=True,
+                config=self.sweep_config,
+                # name=self.run_name,
+                save_code=True,
+            ):
+            self.args = wandb.config
+            for k, v in tyro.cli(Args).__dict__.items():
+                if k not in self.args:
+                    self.args[str(k)] = v
+            self.learn(self.args.total_epoch, self.my_callback)

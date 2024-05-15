@@ -75,14 +75,14 @@ class ActorCriticPolicy(BasePolicy):
         ortho_init: bool = True,
         use_sde: bool = False,
         log_std_init: float = 0.0,
-        full_std: bool = True,
+        full_std: bool = False,
         use_expln: bool = False,
         squash_output: bool = False,
         cuda: bool = True,
         features_extractor_class: Type[BaseFeaturesExtractor] = FlattenExtractor,
         features_extractor_kwargs: Optional[Dict[str, Any]] = None,
         share_features_extractor: bool = False,
-        optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam,
+        optimizer_class: Type[th.optim.Optimizer] = th.optim.SGD,
         optimizer_kwargs: Optional[Dict[str, Any]] = None,
     ):
         if optimizer_kwargs is None:
@@ -238,8 +238,8 @@ class ActorCriticPolicy(BasePolicy):
             module_gains = {
                 self.features_extractor: np.sqrt(2),
                 self.mlp_extractor: np.sqrt(2),
-                self.action_net: 0.01,
-                self.value_net: 1,
+                self.action_net: 0.1,
+                self.value_net: 10,
             }
             if not self.share_features_extractor:
                 # Note(antonin): this is to keep SB3 results

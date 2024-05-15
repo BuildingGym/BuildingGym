@@ -220,7 +220,7 @@ class ep_simu(idf_simu.IDF_simu):
             q_values = self.agent(torch.Tensor(value).to(device))
             actions = torch.argmax(q_values, dim=0).cpu().numpy()
         com = [23 + actions]
-        # com = [26]
+        com = [24]
         return com, [actions]
         
 if __name__ == '__main__':

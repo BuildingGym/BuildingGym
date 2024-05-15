@@ -125,7 +125,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
                 self.rollout_buffer_class = RolloutBuffer
 
         self.rollout_buffer = self.rollout_buffer_class(
-            64,
+            self.batch_size,
             self.observation_space,  # type: ignore[arg-type]
             self.action_space,
             device=self.device,
@@ -183,19 +183,21 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             env.cal_r()
             # env.cal_return()
 
-            data_wt = env.sensor_dic.iloc[np.where(env.sensor_dic['Working_time'])[0]]
-            # random sample
-            assert self.batch_size<env.sensor_dic.shape[0], f'Batch size should samller than {data_wt.shape[0]}'
+            self.data_wt = env.sensor_dic.iloc[np.where(env.sensor_dic['Working_time'])[0]]
+
+            assert self.batch_size<env.sensor_dic.shape[0], f'Batch size should samller than {self.data_wt.shape[0]}'
 
             obs_nor = [env.observation_var[i] + '_nor' for i in range(len(env.observation_var))]
-            _obs = np.array(data_wt[obs_nor])
-            _terminal_state = np.array(data_wt['Terminations'])
-            _rewards = np.array(data_wt['rewards'])
+            _obs = np.array(self.data_wt[obs_nor])
+            _terminal_state = np.array(self.data_wt['Terminations'])
+            _rewards = np.array(self.data_wt['rewards'])
+            performance = np.mean(self.data_wt['results'])
 
-            index = random.sample(range(0, _obs.shape[0]), self.batch_size)
+            index = random.randint(0, _obs.shape[0]-self.batch_size-1)
 
-            _terminal_state = _terminal_state[index]
-            _obs = _obs[index,:]
+            _terminal_state = _terminal_state[index:index+self.batch_size]
+            _obs = _obs[index:index+self.batch_size,:]
+            _rewards = _rewards[index:index+self.batch_size]
             with th.no_grad():
                 # Convert to pytorch tensor or to TensorDict
                 obs_tensor = obs_as_tensor(_obs, self.device)
@@ -222,7 +224,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             # Give access to local variables
             callback.update_locals(locals())
             if not callback.on_step():
-                return False
+                return False, performance
 
             # self._update_info_buffer(infos, dones)
             n_steps += 1
@@ -249,25 +251,26 @@ class OnPolicyAlgorithm(BaseAlgorithm):
                     _obs[k],  # type: ignore[arg-type]
                     actions[k],
                     _rewards[k],
-                    False,  # type: ignore[arg-type]
+                    _terminal_state[k],  # type: ignore[arg-type]
                     # self._last_episode_starts,  # type: ignore[arg-type]
                     values[k],
                     log_probs[k],
                 )
-            self._last_obs = _obs[-1]  # type: ignore[assignment]
-            self._last_episode_starts = False
+            self._last_obs = _obs[k]  # type: ignore[assignment]
+            self._last_episode_starts = _terminal_state[k]
 
-        # with th.no_grad():
+        with th.no_grad():
             # Compute value for the last timestep
-            # values = self.policy.predict_values(obs_as_tensor(new_obs, self.device))  # type: ignore[arg-type]
+            last_values = self.policy.predict_values(torch.tensor(self._last_obs).to('cuda').unsqueeze(0))
 
-        # rollout_buffer.compute_returns_and_advantage(last_values=values, dones=False)
+
+        rollout_buffer.compute_returns_and_advantage(last_values=last_values, dones=_terminal_state[k])
 
         callback.update_locals(locals())
 
         callback.on_rollout_end()
 
-        return True
+        return True, performance
 
     def train(self) -> None:
         """
@@ -306,6 +309,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         tb_log_name: str = "OnPolicyAlgorithm",
         reset_num_timesteps: bool = True,
         progress_bar: bool = False,
+        train_perEp: int = 10
     ) -> SelfOnPolicyAlgorithm:
         iteration = 0
 
@@ -322,7 +326,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         assert self.env is not None
 
         while self.num_timesteps < total_timesteps:
-            continue_training = self.collect_rollouts(self.env, callback, self.rollout_buffer, n_rollout_steps=self.n_steps)
+            continue_training, performance = self.collect_rollouts(self.env, callback, self.rollout_buffer, n_rollout_steps=self.n_steps)
 
             if not continue_training:
                 break
@@ -334,12 +338,12 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             if log_interval is not None and iteration % log_interval == 0:
                 assert self.ep_info_buffer is not None
                 self._dump_logs(iteration)
-
-            self.train()
+            for i in range(train_perEp):
+                self.env.p_loss, self.env.v_loss, self.env.prob = self.train()
 
         callback.on_training_end()
 
-        return self
+        return self, performance
 
     def _get_torch_save_params(self) -> Tuple[List[str], List[str]]:
         state_dicts = ["policy", "policy.optimizer"]
