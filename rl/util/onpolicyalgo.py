@@ -204,6 +204,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             _obs = np.array(self.data_wt[obs_nor])
             _terminal_state = np.array(self.data_wt['Terminations'])
             _rewards = np.array(self.data_wt['rewards'])
+            _actions = np.array(self.data_wt['actions'])
             performance = np.mean(self.data_wt['results'])
 
             # index = random.randint(0, _obs.shape[0]-self.batch_size-1)
@@ -262,7 +263,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             for k in range(_obs.shape[0]):
                 rollout_buffer.add(
                     _obs[k],  # type: ignore[arg-type]
-                    actions[k],
+                    _actions[k],
                     _rewards[k],
                     _terminal_state[k],  # type: ignore[arg-type]
                     # self._last_episode_starts,  # type: ignore[arg-type]
@@ -277,8 +278,8 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             last_values = self.policy.predict_values(torch.tensor(self._last_obs).to('cuda').unsqueeze(0))
 
         rollout_buffer.remove_tail(n_rollout_steps)
-        rollout_buffer.compute_returns_and_advantage_seg(last_values=last_values, dones=_terminal_state[k], step_length = n_rollout_steps)
-
+        rollout_buffer.compute_returns_and_advantage_seg(last_values=values[rollout_buffer.buffer_size-1], dones=_terminal_state[rollout_buffer.buffer_size-1], step_length = n_rollout_steps)
+        self.data_wt = self.data_wt[0:rollout_buffer.buffer_size]
         callback.update_locals(locals())
 
         callback.on_rollout_end()

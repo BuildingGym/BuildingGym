@@ -38,6 +38,6 @@ class Args:
     sde_sample_freq: int = -1
     train_perEp: int = 10
     pol_coef: float = 1.
-    total_epoch: int = 2000
+    total_epoch: int = 200
     max_train_perEp: int = 100
 

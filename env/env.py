@@ -117,7 +117,7 @@ class buildinggym_env():
         # remove data without enough outlook step
         dt = int(60/self.args.n_time_step)
         dt = pd.to_timedelta(dt, unit='min')
-        end -= dt
+        # end -= dt
         wt = [] # wt: working time label
         terminations = [] # terminations: end of working time
         for i in range(int(self.sensor_dic.shape[0])):
@@ -128,7 +128,7 @@ class buildinggym_env():
                 wt.append(True)
             else:
                 wt.append(False)
-            if t >= end:
+            if t >= end - dt:
                 terminations.append(True)
             else:
                 terminations.append(False)
@@ -188,13 +188,15 @@ class buildinggym_env():
             with torch.no_grad():
                 actions, value, logprob = self.agent(state)
                 # actions = torch.argmax(q_values, dim=0).cpu().numpy()
-            com = 23. + actions.cpu().numpy()[0]
+            actions = actions.cpu().numpy()[0]
+            com = 23. + actions
 
             act = thinenv.act({'Thermostat': com})
             
             obs = pd.DataFrame(obs, index = [self.sensor_index])
             obs.insert(0, 'Time', t)
             obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', com)
+            obs.insert(obs.columns.get_loc("t_in") + 1, 'actions', actions)
             # obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().numpy())
             # obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value.flatten().cpu().numpy())
             # obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', 1)
