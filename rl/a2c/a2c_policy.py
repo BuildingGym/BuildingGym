@@ -82,7 +82,7 @@ class ActorCriticPolicy(BasePolicy):
         features_extractor_class: Type[BaseFeaturesExtractor] = FlattenExtractor,
         features_extractor_kwargs: Optional[Dict[str, Any]] = None,
         share_features_extractor: bool = False,
-        optimizer_class: Type[th.optim.Optimizer] = th.optim.SGD,
+        optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam,
         optimizer_kwargs: Optional[Dict[str, Any]] = None,
     ):
         if optimizer_kwargs is None:

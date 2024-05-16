@@ -27,9 +27,9 @@ class Args:
     n_time_step: int = 6
     """the number of steps in one hour"""    
 
-    learning_rate: float = 7e-5
+    learning_rate: float = 7e-2
     n_steps: int = 5
-    gamma: float = 0.99
+    gamma: float = 0.9
     gae_lambda: float = 0.9
     ent_coef: float = 0.0
     vf_coef: float = 0.5
@@ -38,6 +38,6 @@ class Args:
     sde_sample_freq: int = -1
     train_perEp: int = 10
     pol_coef: float = 1.
-    total_epoch: int = 200
-    max_train_perEp: int = 100
+    total_epoch: int = 300
+    max_train_perEp: int = 1
 

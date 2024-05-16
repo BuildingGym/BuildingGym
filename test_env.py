@@ -137,22 +137,22 @@ a = A2C(ActorCriticPolicy, env, Args, my_callback)
 
 parameters_dict = {
 'learning_rate': {
-    'values': [1e-6]
+    'values': [1e-6, 1e-4, 1e-2]
     },
 'max_train_perEp': {
-        'values': [1]
+        'values': [1, 10, 100]
     },  
 'gamma': {
         'values': [0.9, 0.8, 0.5]
     },         
 'n_steps': {
-      'values': [5]
+      'values': [3, 5, 10]
     },     
 # 'train_frequency': {
 #       'values': [1, 5, 10]
 #     },   
 'gae_lambda': {
-      'values': [1]
+      'values': [1, 0.9]
     },                                
 }
 sweep_config = {
@@ -165,7 +165,7 @@ metric = {
 sweep_config['metric'] = metric
 sweep_config['parameters'] = parameters_dict
 
-sweep_id = wandb.sweep(sweep_config, project="a2c-auto")
+sweep_id = wandb.sweep(sweep_config, project="a2c-auto-adam")
 
 wandb.agent(sweep_id, a.train_auto_fine_tune, count=16) 
 

@@ -197,15 +197,19 @@ class buildinggym_env():
             obs.insert(0, 'Time', t)
             obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', com)
             obs.insert(obs.columns.get_loc("t_in") + 1, 'actions', actions)
-            # obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().numpy())
-            # obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value.flatten().cpu().numpy())
+            # obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob)
+            # obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value.flatten())
             # obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', 1)
             # obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', 1)
-            # obs.insert(obs.columns.get_loc("t_in") + 1, 'values', 1)            
+            # obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value)            
             if self.sensor_index == 0:
                 self.sensor_dic = pd.DataFrame({})
                 self.sensor_dic = obs
+                self.logprobs = [logprob]
+                self.values = [value]
             else:
-                self.sensor_dic = pd.concat([self.sensor_dic, obs])            
+                self.sensor_dic = pd.concat([self.sensor_dic, obs])           
+                self.logprobs.append(logprob) 
+                self.values.append(value) 
             self.sensor_index+=1
             
