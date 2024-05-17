@@ -144,7 +144,7 @@ class buildinggym_env():
             energy_i = self.sensor_dic['Chiller Electricity Rate'].iloc[j]
             k = j % (24*self.args.n_time_step)
             baseline_i = baseline['Day_mean'].iloc[k]
-            reward_i = max(0.3 - 1*(abs(energy_i ** 2 - baseline_i ** 2)/baseline_i ** 2), -1)
+            reward_i = round(0.3 - abs(energy_i ** 2 - baseline_i ** 2)/baseline_i ** 2,1)
             result_i = round(1 - abs(energy_i - baseline_i)/baseline_i,1)
             reward.append(reward_i)
             result.append(result_i)          
@@ -188,7 +188,7 @@ class buildinggym_env():
             with torch.no_grad():
                 actions, value, logprob = self.agent(state)
                 # actions = torch.argmax(q_values, dim=0).cpu().numpy()
-            actions = actions.cpu().numpy()[0]
+            actions = actions.cpu().numpy()
             com = 23. + actions
 
             act = thinenv.act({'Thermostat': com})

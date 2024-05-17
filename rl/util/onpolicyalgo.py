@@ -16,6 +16,7 @@ from stable_baselines3.common.vec_env import VecEnv
 from env.env import buildinggym_env
 import torch
 import random
+from rl.a2c.network import Agent
 
 SelfOnPolicyAlgorithm = TypeVar("SelfOnPolicyAlgorithm", bound="OnPolicyAlgorithm")
 
@@ -58,14 +59,17 @@ class OnPolicyAlgorithm(BaseAlgorithm):
     """
 
     rollout_buffer: RolloutBuffer
-    policy: ActorCriticPolicy
+    # policy: Union[str, Type[ActorCriticPolicy], Agent]
+    policy: Union[str, Type[Agent]]
 
     def __init__(
         self,
-        policy: Union[str, Type[ActorCriticPolicy]],
+        policy: Union[str, Type[Agent]],
+        # policy: Union[str, Type[ActorCriticPolicy], Agent],
         env: buildinggym_env,
         learning_rate: Union[float, Schedule],
         n_steps: int,
+        batch_size: int,
         gamma: float,
         gae_lambda: float,
         ent_coef: float,
@@ -89,6 +93,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             policy=policy,
             env=env,
             learning_rate=learning_rate,
+            batch_size = batch_size,
             policy_kwargs=policy_kwargs,
             verbose=verbose,
             device=device,
@@ -110,6 +115,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         self.max_grad_norm = max_grad_norm
         self.rollout_buffer_class = rollout_buffer_class
         self.rollout_buffer_kwargs = rollout_buffer_kwargs or {}
+        self.use_sde = use_sde
 
         if _init_setup_model:
             self._setup_model()
@@ -218,14 +224,16 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             # _terminal_state = _terminal_state[index:index+self.batch_size]
             # _obs = _obs[index:index+self.batch_size,:]
             # _rewards = _rewards[index:index+self.batch_size]
-            with th.no_grad():
-                # Convert to pytorch tensor or to TensorDict
-                obs_tensor = obs_as_tensor(_obs, self.device)
-                actions, values, log_probs = self.policy(obs_tensor.float())
-            actions = actions.cpu().numpy()
+
+
+            # with th.no_grad():
+            #     # Convert to pytorch tensor or to TensorDict
+            #     obs_tensor = obs_as_tensor(_obs, self.device)
+            #     actions, values, log_probs = self.policy(obs_tensor.float())
+            # actions = actions.cpu().numpy()
 
             # Rescale and perform action
-            clipped_actions = actions
+            # clipped_actions = actions
 
             if isinstance(self.action_space, spaces.Box):
                 if self.policy.squash_output:
@@ -249,9 +257,9 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             # self._update_info_buffer(infos, dones)
             n_steps += 1
 
-            if isinstance(self.action_space, spaces.Discrete):
-                # Reshape in case of discrete action
-                actions = actions.reshape(-1, 1)
+            # if isinstance(self.action_space, spaces.Discrete):
+            #     # Reshape in case of discrete action
+            #     actions = actions.reshape(-1, 1)
 
             # Handle timeout by bootstraping with value function
             # see GitHub issue #633
@@ -261,7 +269,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
                     # and infos[idx].get("terminal_observation") is not None
                     # and infos[idx].get("TimeLimit.truncated", False)
                 ):
-                    terminal_obs = torch.tensor(_obs[idx]).to('cuda').unsqueeze(0)
+                    terminal_obs = torch.tensor(_obs[idx]).to('cuda').unsqueeze(0).float()
                     with th.no_grad():
                         terminal_value = self.policy.predict_values(terminal_obs)[0]  # type: ignore[arg-type]
                     _rewards[idx] += self.gamma * terminal_value
@@ -281,10 +289,10 @@ class OnPolicyAlgorithm(BaseAlgorithm):
 
         with th.no_grad():
             # Compute value for the last timestep
-            last_values = self.policy.predict_values(torch.tensor(self._last_obs).to('cuda').unsqueeze(0))
+            last_values = self.policy.predict_values(torch.tensor(self._last_obs).to('cuda').unsqueeze(0).float())
 
         rollout_buffer.remove_tail(n_rollout_steps)
-        rollout_buffer.compute_returns_and_advantage_seg(last_values=values[rollout_buffer.buffer_size-1], dones=_terminal_state[rollout_buffer.buffer_size-1], step_length = n_rollout_steps)
+        rollout_buffer.compute_returns_and_advantage_seg(last_values=_values[rollout_buffer.buffer_size-1], dones=_terminal_state[rollout_buffer.buffer_size-1], step_length = n_rollout_steps)
         self.data_wt = self.data_wt[0:rollout_buffer.buffer_size]
         callback.update_locals(locals())
 

@@ -10,6 +10,7 @@ from energyplus.ooep import (
     OutputVariable,
 )
 from rl.a2c.a2c_policy import ActorCriticPolicy
+from rl.a2c.network import Agent
 from rl.util.schedule import ConstantSchedule
 from gymnasium.spaces import (
     Box,
@@ -88,7 +89,7 @@ action_space = _gymnasium_.spaces.Dict({
 schedule = ConstantSchedule(0.0001)
 input_sp = Box(np.array([0] * 5), np.array([1] * 5))
 action_sp = Discrete(5)
-agent = ActorCriticPolicy(input_sp, action_sp, schedule.value)
+agent = Agent(input_sp, action_sp, schedule.value)
 env = buildinggym_env('Large office - 1AV232.idf',
                     'USA_FL_Miami.722020_TMY2.epw',
                     observation_space,
@@ -121,52 +122,52 @@ run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 
 
 
-a = A2C(ActorCriticPolicy, env, Args, my_callback)
+a = A2C(Agent, env, Args, my_callback, batch_size=args.batch_size)
 
-# wandb.init(
-#     project=args.wandb_project_name,
-#     entity=args.wandb_entity,
-#     sync_tensorboard=True,
-#     config=args,
-#     name=run_name,
-#     save_code=False,
-# )
-# _, performance = a.learn(args.total_epoch, my_callback)
+wandb.init(
+    project=args.wandb_project_name,
+    entity=args.wandb_entity,
+    sync_tensorboard=True,
+    config=args,
+    name=run_name,
+    save_code=False,
+)
+_, performance = a.learn(args.total_epoch, my_callback)
 
 
 
-parameters_dict = {
-'learning_rate': {
-    'values': [1e-6, 1e-4, 1e-2]
-    },
-'max_train_perEp': {
-        'values': [1, 10, 100]
-    },  
-'gamma': {
-        'values': [0.9, 0.8, 0.5]
-    },         
-'n_steps': {
-      'values': [3, 5, 10]
-    },     
-# 'train_frequency': {
-#       'values': [1, 5, 10]
-#     },   
-'gae_lambda': {
-      'values': [1, 0.9]
-    },                                
-}
-sweep_config = {
-'method': 'random'
-}
-metric = {
-'name': 'performance',
-'goal': 'maximize'   
-}
-sweep_config['metric'] = metric
-sweep_config['parameters'] = parameters_dict
+# parameters_dict = {
+# 'learning_rate': {
+#     'values': [1e-6, 1e-4, 1e-2]
+#     },
+# 'max_train_perEp': {
+#         'values': [1, 10, 100]
+#     },  
+# 'gamma': {
+#         'values': [0.9, 0.8, 0.5]
+#     },         
+# 'n_steps': {
+#       'values': [3, 5, 10]
+#     },     
+# # 'train_frequency': {
+# #       'values': [1, 5, 10]
+# #     },   
+# 'gae_lambda': {
+#       'values': [1, 0.9]
+#     },                                
+# }
+# sweep_config = {
+# 'method': 'random'
+# }
+# metric = {
+# 'name': 'performance',
+# 'goal': 'maximize'   
+# }
+# sweep_config['metric'] = metric
+# sweep_config['parameters'] = parameters_dict
 
-sweep_id = wandb.sweep(sweep_config, project="a2c-auto-adam")
+# sweep_id = wandb.sweep(sweep_config, project="a2c-auto-adam")
 
-wandb.agent(sweep_id, a.train_auto_fine_tune, count=16) 
+# wandb.agent(sweep_id, a.train_auto_fine_tune, count=16) 
 
 dxl = 'success'

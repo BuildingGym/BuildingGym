@@ -108,7 +108,7 @@ class BaseAlgorithm(ABC):
         policy: Union[str, Type[BasePolicy]],
         env: buildinggym_env,
         learning_rate: Union[float, Schedule],
-        batch_size: int =24,
+        batch_size: int,
         policy_kwargs: Optional[Dict[str, Any]] = None,
         stats_window_size: int = 100,
         tensorboard_log: Optional[str] = None,

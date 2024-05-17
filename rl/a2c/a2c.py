@@ -12,6 +12,7 @@ from stable_baselines3.common.utils import explained_variance
 from env.env import buildinggym_env
 import numpy as np
 import wandb
+from rl.a2c.network import Agent
 
 SelfA2C = TypeVar("SelfA2C", bound="A2C")
 
@@ -68,12 +69,13 @@ class A2C(OnPolicyAlgorithm):
 
     def __init__(
         self,
-        policy: Union[str, Type[ActorCriticPolicy]],
+        policy: Union[str, Type[Agent]],
         env: buildinggym_env,
         args: Args,
         my_callback = None,
         learning_rate: Union[float, Schedule] = 1e-4,
         n_steps: int = 5,
+        batch_size: int = 64,
         gamma: float = 0.9,
         gae_lambda: float = 1.0,
         ent_coef: float = 0,
@@ -102,6 +104,7 @@ class A2C(OnPolicyAlgorithm):
             env,
             learning_rate=self.args.learning_rate,
             n_steps=self.args.n_steps,
+            batch_size = batch_size,
             gamma=self.args.gamma,
             gae_lambda=self.args.gae_lambda,
             ent_coef=self.args.ent_coef,
@@ -160,6 +163,7 @@ class A2C(OnPolicyAlgorithm):
                 actions = actions.long().flatten()
 
             values, log_prob, entropy = self.policy.evaluate_actions(rollout_data.observations, actions)
+            # values, log_prob, entropy = rollout_data.old_log_prob
             values = values.flatten()
 
             # Normalize advantage (not present in the original implementation)
