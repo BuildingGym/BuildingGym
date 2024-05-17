@@ -51,7 +51,7 @@ class MlpBuild(nn.Module):
         policy_net: List[nn.Module] = []
         value_net: List[nn.Module] = []
         last_layer_dim_pi = feature_dim
-        last_layer_dim_vf = action_dim
+        last_layer_dim_vf = feature_dim
 
         # save dimensions of layers in policy and value nets
         if isinstance(net_arch, dict):

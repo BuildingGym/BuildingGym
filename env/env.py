@@ -61,6 +61,8 @@ class buildinggym_env():
                  epw_file,
                  observation_space,
                  action_space,
+                 observation_dim,
+                 action_dim,
                  agent,
                  args) -> None:
         global thinenv
@@ -77,8 +79,8 @@ class buildinggym_env():
             )
         )
         # To update:
-        self.observation_space = Box(np.array([-np.inf] * 5), np.array([np.inf] * 5))
-        self.action_space = Discrete(5)
+        self.observation_space = Box(np.array([-np.inf] * observation_dim), np.array([np.inf] * observation_dim))
+        self.action_space = Discrete(action_dim)
         self.observation_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
         self.action_var = ['Thermostat']
         self.num_envs = 1

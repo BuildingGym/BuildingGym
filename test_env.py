@@ -94,6 +94,8 @@ env = buildinggym_env('Large office - 1AV232.idf',
                     'USA_FL_Miami.722020_TMY2.epw',
                     observation_space,
                     action_space,
+                    input_sp.shape[0],
+                    action_sp.n,
                     agent,
                     Args)
 
