@@ -1,3 +1,4 @@
+# from env.env_new_r import buildinggym_env
 from env.env import buildinggym_env
 import gymnasium as _gymnasium_
 from energyplus.ooep.addons.rl import (
@@ -24,6 +25,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 import wandb
 import tyro
 import time
+import torch as th
 
 observation_space = _gymnasium_.spaces.Dict({
             't_out': VariableBox(
@@ -90,7 +92,7 @@ schedule = ConstantSchedule(0.0001)
 input_sp = Box(np.array([0] * 5), np.array([1] * 5))
 action_sp = Discrete(5)
 agent = Agent(input_sp, action_sp, schedule.value)
-env = buildinggym_env('Large office - 1AV232.idf',
+env = buildinggym_env('Large office - 1AV232 - Short.idf',
                     'USA_FL_Miami.722020_TMY2.epw',
                     observation_space,
                     action_space,
@@ -123,8 +125,13 @@ args = tyro.cli(Args)
 run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 
 
-
-a = A2C(Agent, env, Args, my_callback, batch_size=args.batch_size)
+a = A2C(Agent,
+        env,
+        Args,
+        my_callback,
+        batch_size=args.batch_size,
+        policy_kwargs = {'optimizer_class': args.optimizer_class},
+        max_train_perEp = args.max_train_perEp)
 
 wandb.init(
     project=args.wandb_project_name,
@@ -146,16 +153,16 @@ _, performance = a.learn(args.total_epoch, my_callback)
 #         'values': [1, 10, 100]
 #     },  
 # 'gamma': {
-#         'values': [0.9, 0.8, 0.5]
+#         'values': [0.1]
 #     },         
 # 'n_steps': {
-#       'values': [3, 5, 10]
+#       'values': [32, 6]
 #     },     
 # # 'train_frequency': {
 # #       'values': [1, 5, 10]
 # #     },   
 # 'gae_lambda': {
-#       'values': [1, 0.9]
+#       'values': [1, 0.1]
 #     },                                
 # }
 # sweep_config = {
@@ -168,7 +175,7 @@ _, performance = a.learn(args.total_epoch, my_callback)
 # sweep_config['metric'] = metric
 # sweep_config['parameters'] = parameters_dict
 
-# sweep_id = wandb.sweep(sweep_config, project="a2c-auto-adam")
+# sweep_id = wandb.sweep(sweep_config, project="a2c-auto")
 
 # wandb.agent(sweep_id, a.train_auto_fine_tune, count=16) 
 

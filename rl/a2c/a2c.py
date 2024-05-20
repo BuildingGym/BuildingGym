@@ -81,6 +81,7 @@ class A2C(OnPolicyAlgorithm):
         ent_coef: float = 0,
         vf_coef: float = 0.5,
         max_grad_norm: float = 10,
+        max_train_perEp: int = 100,
         rms_prop_eps: float = 1e-5,
         use_rms_prop: bool = True,
         use_sde: bool = False,
@@ -131,6 +132,7 @@ class A2C(OnPolicyAlgorithm):
 
         self.normalize_advantage = normalize_advantage
         self.observation_var = env.observation_var
+        self.max_train_perEp = max_train_perEp
 
         # Update optimizer inside the policy if we want to use RMSProp
         # (original implementation) rather than Adam
@@ -153,8 +155,8 @@ class A2C(OnPolicyAlgorithm):
         self._update_learning_rate(self.policy.optimizer)
 
         # This will only loop once (get all data in one go)
+        n_train = 0
         for rollout_data in self.rollout_buffer.get(batch_size=self.batch_size):
-            n_train = 0
             if n_train >= max_train_perEp:
                 break
             actions = rollout_data.actions
@@ -163,6 +165,8 @@ class A2C(OnPolicyAlgorithm):
                 actions = actions.long().flatten()
 
             values, log_prob, entropy = self.policy.evaluate_actions(rollout_data.observations, actions)
+            # for name, param in self.policy.named_parameters():
+            #     print(name, param.shape)            
             # values, log_prob, entropy = rollout_data.old_log_prob
             values = values.flatten()
 
@@ -172,7 +176,7 @@ class A2C(OnPolicyAlgorithm):
                 advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
             # Policy gradient loss
-            policy_loss = -(advantages * log_prob).mean()
+            policy_loss = -(10*advantages * log_prob).mean()
 
             # Value loss using the TD(gae_lambda) target
             value_loss = F.mse_loss(rollout_data.returns, values)
@@ -189,7 +193,11 @@ class A2C(OnPolicyAlgorithm):
             # Optimization step
             self.policy.optimizer.zero_grad()
             loss.backward()
-
+            # Check gradient
+            # for name, param in self.policy.mlp_extractor.named_parameters():
+            for name, param in self.policy.action_network.named_parameters():
+                if param.requires_grad:
+                    print(f"{name}: {param.grad}")       
             # Clip grad norm
             th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
             self.policy.optimizer.step()
@@ -205,7 +213,7 @@ class A2C(OnPolicyAlgorithm):
         self.logger.record("train/value_loss", value_loss.item())
         if hasattr(self.policy, "log_std"):
             self.logger.record("train/std", th.exp(self.policy.log_std).mean().item())
-        return policy_loss.item(), value_loss.item(), np.mean(np.array(log_prob.detach().cpu()))
+        return policy_loss.item(), value_loss.item(), np.mean(self.rollout_buffer.log_probs[106])
 
 
     def learn(
@@ -225,7 +233,7 @@ class A2C(OnPolicyAlgorithm):
             tb_log_name=tb_log_name,
             reset_num_timesteps=reset_num_timesteps,
             progress_bar=progress_bar,
-            max_train_perEp=max_train_perEp
+            max_train_perEp=self.max_train_perEp
         )
         return performance
     

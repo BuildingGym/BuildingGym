@@ -27,6 +27,7 @@ from stable_baselines3.common.distributions import (
     StateDependentNoiseDistribution,
     make_proba_distribution,
 )
+from rl.util.FeatureExt_network import FEBuild
 from rl.util.build_network import MlpBuild
 from stable_baselines3.common.torch_layers import (
     BaseFeaturesExtractor,
@@ -50,16 +51,18 @@ class Agent(nn.Module):
                 action_space: spaces.Space,
                 lr_schedule: Schedule,
                 net_arch: Optional[Union[List[int], Dict[str, List[int]]]] = None,
-                optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam,
+                Fe_arch: Optional[Union[List[int], Dict[str, List[int]]]] = None,
+                optimizer_class: Type[th.optim.Optimizer] = th.optim.SGD,
                 activation_fn: Type[nn.Module] = nn.Tanh,
-                extract_features_bool: bool = False,
-                share_features_extractor: bool = False,
+                extract_features_bool: bool = True,
+                share_features_extractor: bool = True,
                 device: Union[str, torch.device] = 'cuda',
                 optimizer_kwargs: Optional[Dict[str, Any]] = None,
                 use_sde: bool = False,
-                ortho_init: bool = False
+                ortho_init: bool = False,
+                xa_init_gain: float = 0.5,
                 ):
-        super().__init__()
+        super(Agent, self).__init__()
         self.activation_fn = activation_fn
         self.observation_space = observation_space
         self.action_space = action_space
@@ -89,21 +92,35 @@ class Agent(nn.Module):
         self.lr_schedule = lr_schedule
         # Default network architecture, from stable-baselines
         if net_arch is None:
-                net_arch = dict(pi=[64, 64], vf=[64, 64])
+                net_arch = dict(pi=[32], vf=[32, 32])
         self.net_arch = net_arch
 
-        self.features_extractor = None
-        self.mlp_extractor = MlpBuild(
+        if Fe_arch is None:
+                Fe_arch = [128, 64]
+        self.features_extractor = FEBuild(
             self.observation_space.shape[0],
-            self.action_space.n,
+            Fe_arch = Fe_arch,
+            share_features_extractor = self.share_features_extractor,
+            device=self.device,
+        )
+        self.mlp_extractor = MlpBuild(
+            self.features_extractor.latent_dim_pi,
+            self.features_extractor.latent_dim_vf,
+            # self.action_space.n,
             net_arch=self.net_arch,
             activation_fn=self.activation_fn,
             device=self.device,
         )
 
-        self.action_network = nn.Sequential(nn.Linear(self.mlp_extractor.latent_dim_pi, self.action_space.n),
-                                             nn.Softmax(dim=-1),
-                                             ).to(self.device)
+        self.action_network = nn.Sequential(
+                                    nn.Linear(self.mlp_extractor.latent_dim_pi, self.action_space.n),
+                                    nn.Softmax(dim =-1),
+                                    ).to(self.device)
+      
+        # self.xa_init_gain = xa_init_gain
+        self.init_weight(self.action_network)
+        self.init_weight(self.mlp_extractor.policy_net)
+        
         self.value_network = nn.Linear(self.mlp_extractor.latent_dim_vf, 1, device=self.device)
         self._build(lr_schedule)
 
@@ -124,15 +141,15 @@ class Agent(nn.Module):
         """
         # Preprocess the observation if needed
         if self.extract_features_bool:
-            features = self.extract_features(obs)
+            pi_features, vf_features = self.features_extractor.extract_features(obs)
         else:
-            features = obs
-        if self.share_features_extractor:
-            latent_pi, latent_vf = self.mlp_extractor(features)
-        else:
-            pi_features=vf_features = features
-            latent_pi = self.mlp_extractor.forward_actor(pi_features)
-            latent_vf = self.mlp_extractor.forward_critic(vf_features)
+            pi_features = vf_features = obs
+        # if self.share_features_extractor:
+        #     latent_pi, latent_vf = self.features_extractor(features)
+        # else:
+        #     pi_features=vf_features = features
+        latent_pi = self.mlp_extractor.forward_actor(pi_features)
+        latent_vf = self.mlp_extractor.forward_critic(vf_features)
         # Evaluate the values for the given observations
         values = self.value_network(latent_vf)
         distribution = self._get_action_dist_from_latent(latent_pi)
@@ -189,15 +206,16 @@ class Agent(nn.Module):
         """
         # Preprocess the observation if needed
         if self.extract_features_bool:
-            features = self.extract_features(obs)
+            features = self.features_extractor.extract_features(obs)
         else:
             features = obs
         if self.share_features_extractor:
-            latent_pi, latent_vf = self.mlp_extractor(features)
+            pi_features, vf_features = self.features_extractor.extract_features(obs)
         else:
-            pi_features=vf_features = features
-            latent_pi = self.mlp_extractor.forward_actor(pi_features)
-            latent_vf = self.mlp_extractor.forward_critic(vf_features)
+            pi_features = features[0]
+            vf_features = features[1]
+        latent_pi = self.mlp_extractor.forward_actor(pi_features)
+        latent_vf = self.mlp_extractor.forward_critic(vf_features)
         distribution = self._get_action_dist_from_latent(latent_pi)
         log_prob = distribution.log_prob(actions)
         values = self.value_network(latent_vf)
@@ -212,10 +230,10 @@ class Agent(nn.Module):
         :return: the action distribution.
         """
         if self.extract_features_bool:
-            features = super().extract_features(obs, self.pi_features_extractor)
+            features = self.features_extractor.extract_features(obs)
         else:
             features = obs
-        latent_pi = self.mlp_extractor.forward_actor(features)
+        latent_pi = self.mlp_extractor.forward_actor(features[0])
         return self._get_action_dist_from_latent(latent_pi)
 
     def predict_values(self, obs: PyTorchObs) -> th.Tensor:
@@ -226,10 +244,10 @@ class Agent(nn.Module):
         :return: the estimated values.
         """
         if self.extract_features_bool:
-            features = super().extract_features(obs, self.vf_features_extractor)
+            features = self.features_extractor.extract_features(obs)
         else:
             features = obs
-        latent_vf = self.mlp_extractor.forward_critic(features)
+        latent_vf = self.mlp_extractor.forward_critic(features[1])
         return self.value_network(latent_vf)           
     
     def _build(self, lr_schedule: Schedule) -> None:
@@ -282,3 +300,17 @@ class Agent(nn.Module):
 
         # Setup optimizer with initial learning rate
         self.optimizer = self.optimizer_class(self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)  # type: ignore[call-arg]    
+
+    def weights_init(self, m):
+        if isinstance(m, nn.Linear):
+            torch.nn.init.normal_(m.weight, mean=self.xa_init_gain, std=0.5)
+            # torch.nn.init.zero_(m.bias)
+
+    # define init method inside your model class
+    def init_weight(self, network):
+        for m in network.modules():
+            if isinstance(m, nn.Linear):
+                # nn.init.normal_(m.weight, mean=0, std=0.5)
+                nn.init.xavier_normal_(m.weight, gain=1)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)    

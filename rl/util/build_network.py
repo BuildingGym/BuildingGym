@@ -39,8 +39,9 @@ class MlpBuild(nn.Module):
 
     def __init__(
         self,
-        feature_dim: int,
-        action_dim: int,
+        feature_actor_dim: int,
+        feature_critic_dim: int,
+        # action_dim: int,
         net_arch: Union[List[int], Dict[str, List[int]]],
         activation_fn: Type[nn.Module],
         device: Union[th.device, str] = "auto",
@@ -50,8 +51,8 @@ class MlpBuild(nn.Module):
         device = get_device(device)
         policy_net: List[nn.Module] = []
         value_net: List[nn.Module] = []
-        last_layer_dim_pi = feature_dim
-        last_layer_dim_vf = feature_dim
+        last_layer_dim_pi = feature_actor_dim
+        last_layer_dim_vf = feature_critic_dim
 
         # save dimensions of layers in policy and value nets
         if isinstance(net_arch, dict):
@@ -66,10 +67,10 @@ class MlpBuild(nn.Module):
             policy_net.append(activation_fn())
             last_layer_dim_pi = curr_layer_dim
 
-        # Add final output layer
-        if not latent_only:
-            policy_net.append(nn.Linear(last_layer_dim_pi, action_dim))
-            policy_net.append(nn.Softmax())   
+        # # Add final output layer
+        # if not latent_only:
+        #     policy_net.append(nn.Linear(last_layer_dim_pi, action_dim))
+        #     policy_net.append(nn.Softmax())   
 
         # Iterate through the value layers and build the value net
         for curr_layer_dim in vf_layers_dims:
@@ -77,9 +78,9 @@ class MlpBuild(nn.Module):
             value_net.append(activation_fn())
             last_layer_dim_vf = curr_layer_dim
 
-        # Add final output layer
-        if not latent_only:
-            value_net.append(nn.Linear(last_layer_dim_pi, 1))             
+        # # Add final output layer
+        # if not latent_only:
+        #     value_net.append(nn.Linear(last_layer_dim_pi, 1))             
          
 
         # Save dim, used to create the distributions
@@ -96,7 +97,7 @@ class MlpBuild(nn.Module):
         :return: latent_policy, latent_value of the specified network.
             If all layers are shared, then ``latent_policy == latent_value``
         """
-        return self.forward_actor(features), self.forward_critic(features)
+        return self.forward_actor(features[0]), self.forward_critic(features[1])
 
     def forward_actor(self, features: th.Tensor) -> th.Tensor:
         return self.policy_net(features)

@@ -146,8 +146,19 @@ class buildinggym_env():
             energy_i = self.sensor_dic['Chiller Electricity Rate'].iloc[j]
             k = j % (24*self.args.n_time_step)
             baseline_i = baseline['Day_mean'].iloc[k]
-            reward_i = round(0.3 - abs(energy_i ** 2 - baseline_i ** 2)/baseline_i ** 2,1)
-            result_i = round(1 - abs(energy_i - baseline_i)/baseline_i,1)
+            result_i = round(1 - abs(energy_i - baseline_i)/baseline_i,2)
+            result_i = max(min(result_i, 1), 0)
+            if result_i>0.85:
+                reward_i = result_i
+                self.steps_within_threshold += 1 
+            else:
+                reward_i = result_i**2
+                self.steps_within_threshold = 0
+
+            if self.steps_within_threshold >= 6:
+                reward_i += 2  # Additional reward for maintaining close load for milestone_steps
+                self.steps_within_threshold = 0  # Reset milestone counter                
+
             reward.append(reward_i)
             result.append(result_i)          
         reward = reward[1:]

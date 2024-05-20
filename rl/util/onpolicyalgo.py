@@ -206,6 +206,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             self.logprobs_wt = [env.logprobs[i] for i in np.where(env.sensor_dic['Working_time'])[0]]
             # self.values_wt = env.values[np.where(env.sensor_dic['Working_time'])[0]]
             self.values_wt = [env.values[i] for i in np.where(env.sensor_dic['Working_time'])[0]]
+            self.actions_wt = [env.actions[i] for i in np.where(env.sensor_dic['Working_time'])[0]]
             rollout_buffer.reset(self.data_wt.shape[0])
 
             assert self.batch_size<env.sensor_dic.shape[0], f'Batch size should samller than {self.data_wt.shape[0]}'
@@ -214,7 +215,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             _obs = np.array(self.data_wt[obs_nor])
             _terminal_state = np.array(self.data_wt['Terminations'])
             _rewards = np.array(self.data_wt['rewards'])
-            _actions = np.array(self.data_wt['actions'])
+            _actions = self.actions_wt
             _values = self.values_wt
             _log_probs = self.logprobs_wt 
             performance = np.mean(self.data_wt['results'])
@@ -277,7 +278,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             for k in range(_obs.shape[0]):
                 rollout_buffer.add(
                     _obs[k],  # type: ignore[arg-type]
-                    _actions[k],
+                    _actions[k].cpu().numpy(),
                     _rewards[k],
                     _terminal_state[k],  # type: ignore[arg-type]
                     # self._last_episode_starts,  # type: ignore[arg-type]
