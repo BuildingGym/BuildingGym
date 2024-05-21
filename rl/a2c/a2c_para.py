@@ -29,10 +29,10 @@ class Args:
     n_time_step: int = 6
     """the number of steps in one hour"""    
 
-    learning_rate: float = 1e-2
-    batch_size: int = 2
-    n_steps: int = 6
-    gamma: float = 0.9
+    learning_rate: float = 0.01
+    batch_size: int = 12
+    n_steps: int = 2
+    gamma: float = 0.1
     gae_lambda: float = 1
     ent_coef: float = 0
     vf_coef: float = 0.5

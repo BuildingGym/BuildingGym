@@ -156,7 +156,8 @@ class A2C(OnPolicyAlgorithm):
 
         # This will only loop once (get all data in one go)
         n_train = 0
-        for rollout_data in self.rollout_buffer.get(batch_size=self.batch_size):
+        # for rollout_data in self.rollout_buffer.get(batch_size=self.batch_size):
+        for rollout_data in self.rollout_buffer.get(batch_size=None):
             if n_train >= max_train_perEp:
                 break
             actions = rollout_data.actions
@@ -176,7 +177,7 @@ class A2C(OnPolicyAlgorithm):
                 advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
             # Policy gradient loss
-            policy_loss = -(10*advantages * log_prob).mean()
+            policy_loss = -(1*advantages * log_prob).mean()
 
             # Value loss using the TD(gae_lambda) target
             value_loss = F.mse_loss(rollout_data.returns, values)
@@ -195,7 +196,7 @@ class A2C(OnPolicyAlgorithm):
             loss.backward()
             # Check gradient
             # for name, param in self.policy.mlp_extractor.named_parameters():
-            for name, param in self.policy.action_network.named_parameters():
+            for name, param in self.policy.features_extractor.policy_fe.named_parameters():
                 if param.requires_grad:
                     print(f"{name}: {param.grad}")       
             # Clip grad norm

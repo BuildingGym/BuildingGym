@@ -90,7 +90,7 @@ action_space = _gymnasium_.spaces.Dict({
                 })
 schedule = ConstantSchedule(0.0001)
 input_sp = Box(np.array([0] * 5), np.array([1] * 5))
-action_sp = Discrete(5)
+action_sp = Discrete(2)
 agent = Agent(input_sp, action_sp, schedule.value)
 env = buildinggym_env('Large office - 1AV232 - Short.idf',
                     'USA_FL_Miami.722020_TMY2.epw',
