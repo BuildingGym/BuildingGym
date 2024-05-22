@@ -72,6 +72,7 @@ class pg(OnPolicyAlgorithm):
         policy: Union[str, Type[Agent]],
         env: buildinggym_env,
         args: Type[Args],
+        run_name: str,
         my_callback = None,
         learning_rate: Union[float, Schedule] = 1e-4,
         n_steps: int = 5,
@@ -135,7 +136,7 @@ class pg(OnPolicyAlgorithm):
         self.normalize_advantage = normalize_advantage
         self.observation_var = env.observation_var
         self.max_train_perEp = max_train_perEp
-
+        self.run_name = run_name
         # Update optimizer inside the policy if we want to use RMSProp
         # (original implementation) rather than Adam
         if use_rms_prop and "optimizer_class" not in self.policy_kwargs:

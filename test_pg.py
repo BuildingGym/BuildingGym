@@ -128,9 +128,11 @@ run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 a = pg(Agent,
         env,
         Args,
+        run_name,
         my_callback,
         policy_kwargs = {'optimizer_class': args.optimizer_class},
-        max_train_perEp = args.max_train_perEp)
+        max_train_perEp = args.max_train_perEp,
+        )
 
 wandb.init(
     project=args.wandb_project_name,

@@ -18,6 +18,7 @@ from env.env import buildinggym_env
 import torch
 import random
 from rl.a2c.network import Agent
+import os
 
 SelfOnPolicyAlgorithm = TypeVar("SelfOnPolicyAlgorithm", bound="OnPolicyAlgorithm")
 
@@ -225,6 +226,11 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             # _values = self.values_wt
             _log_probs = self.logprobs_wt 
             performance = np.mean(self.data_wt['results'][np.where(env.sensor_dic['Working_time'])[0]])
+            if performance > 0.87:
+                path_i = os.path.join('Archive results', self.run_name)
+                os.mkdir(path_i)
+                env.sensor_dic.to_csv(os.path.join(path_i, 'results.csv'))
+                torch.save(self.policy.state_dict(), os.path.join(path_i, 'model.pth'))
             training_data = [_obs, _actions, _rewards, _log_probs]
             # index = random.randint(0, _obs.shape[0]-self.batch_size-1)
 
