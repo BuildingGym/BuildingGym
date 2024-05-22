@@ -7,8 +7,7 @@ import torch as th
 from gymnasium import spaces
 
 from rl.util.base_class import BaseAlgorithm
-# from rl.util.buffers import DictRolloutBuffer, RolloutBuffer, ReplayBuffer
-from rl.util.replaybuffer import ReplayBuffer
+from rl.util.buffers import DictRolloutBuffer, RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
@@ -59,7 +58,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
     :param supported_action_spaces: The action spaces supported by the algorithm.
     """
 
-    rollout_buffer: ReplayBuffer
+    rollout_buffer: RolloutBuffer
     # policy: Union[str, Type[ActorCriticPolicy], Agent]
     policy: Union[str, Type[Agent]]
 
@@ -69,18 +68,17 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         # policy: Union[str, Type[ActorCriticPolicy], Agent],
         env: buildinggym_env,
         learning_rate: Union[float, Schedule],
-        # n_steps: int,
+        n_steps: int,
         batch_size: int,
         gamma: float,
-        # gae_lambda: float,
+        gae_lambda: float,
         ent_coef: float,
-        # vf_coef: float,
+        vf_coef: float,
         max_grad_norm: float,
         use_sde: bool,
         sde_sample_freq: int,
-        buffer_info: List[str],
-        # rollout_buffer_class: Optional[Type[RolloutBuffer]] = None,
-        # rollout_buffer_kwargs: Optional[Dict[str, Any]] = None,
+        rollout_buffer_class: Optional[Type[RolloutBuffer]] = None,
+        rollout_buffer_kwargs: Optional[Dict[str, Any]] = None,
         stats_window_size: int = 100,
         tensorboard_log: Optional[str] = None,
         monitor_wrapper: bool = True,
@@ -109,16 +107,16 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             supported_action_spaces=supported_action_spaces,
         )
 
-        # self.n_steps = n_steps
+        self.n_steps = n_steps
         self.gamma = gamma
-        # self.gae_lambda = gae_lambda
+        self.gae_lambda = gae_lambda
         self.ent_coef = ent_coef
-        # self.vf_coef = vf_coef
+        self.vf_coef = vf_coef
         self.max_grad_norm = max_grad_norm
-        # self.rollout_buffer_class = rollout_buffer_class
-        # self.rollout_buffer_kwargs = rollout_buffer_kwargs or {}
+        self.rollout_buffer_class = rollout_buffer_class
+        self.rollout_buffer_kwargs = rollout_buffer_kwargs or {}
         self.use_sde = use_sde
-        self.buffer_info = buffer_info
+
         if _init_setup_model:
             self._setup_model()
 
@@ -126,47 +124,44 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         self._setup_lr_schedule()
         self.set_random_seed(self.seed)
 
-        # if self.rollout_buffer_class is None:
-        #     if isinstance(self.observation_space, spaces.Dict):
-        #         self.rollout_buffer_class = DictRolloutBuffer
-        #     else:
-        #         self.rollout_buffer_class = RolloutBuffer
+        if self.rollout_buffer_class is None:
+            if isinstance(self.observation_space, spaces.Dict):
+                self.rollout_buffer_class = DictRolloutBuffer
+            else:
+                self.rollout_buffer_class = RolloutBuffer
 
-        # self.rollout_buffer = self.rollout_buffer_class(
-        #     self.batch_size,
-        #     self.observation_space,  # type: ignore[arg-type]
-        #     self.action_space,
-        #     device=self.device,
-        #     gamma=self.gamma,
-        #     gae_lambda=self.gae_lambda,
-        #     n_envs=self.n_envs,
-        #     **self.rollout_buffer_kwargs,
-        # )
-
-        self.rollout_buffer = ReplayBuffer(self.buffer_info)
-        
+        self.rollout_buffer = self.rollout_buffer_class(
+            self.batch_size,
+            self.observation_space,  # type: ignore[arg-type]
+            self.action_space,
+            device=self.device,
+            gamma=self.gamma,
+            gae_lambda=self.gae_lambda,
+            n_envs=self.n_envs,
+            **self.rollout_buffer_kwargs,
+        )
         self.policy = self.policy_class(  # type: ignore[assignment]
             self.observation_space, self.action_space, self.lr_schedule, use_sde=self.use_sde, **self.policy_kwargs
         )
         self.policy = self.policy.to(self.device)
     
-    # def reset_buffer(self, new_batch_size):
-    #     self.rollout_buffer = self.rollout_buffer_class(
-    #         new_batch_size,
-    #         self.observation_space,  # type: ignore[arg-type]
-    #         self.action_space,
-    #         device=self.device,
-    #         gamma=self.gamma,
-    #         gae_lambda=self.gae_lambda,
-    #         n_envs=self.n_envs,
-    #         **self.rollout_buffer_kwargs,
-    #     )        
+    def reset_buffer(self, new_batch_size):
+        self.rollout_buffer = self.rollout_buffer_class(
+            new_batch_size,
+            self.observation_space,  # type: ignore[arg-type]
+            self.action_space,
+            device=self.device,
+            gamma=self.gamma,
+            gae_lambda=self.gae_lambda,
+            n_envs=self.n_envs,
+            **self.rollout_buffer_kwargs,
+        )        
 
     def collect_rollouts(
         self,
         env: buildinggym_env,
         callback: BaseCallback,
-        rollout_buffer: ReplayBuffer,
+        rollout_buffer: RolloutBuffer,
         n_rollout_steps: Union[int, None] = None,
     ) -> bool:
         """
@@ -206,26 +201,25 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             env.cal_r()
             # env.cal_return()
 
-            self.data_wt = env.sensor_dic
+            self.data_wt = env.sensor_dic.iloc[np.where(env.sensor_dic['Working_time'])[0]]
             # self.logprobs_wt = env.logprobs[np.where(env.sensor_dic['Working_time'])[0]]
-            self.logprobs_wt = env.logprobs
+            self.logprobs_wt = [env.logprobs[i] for i in np.where(env.sensor_dic['Working_time'])[0]]
             # self.values_wt = env.values[np.where(env.sensor_dic['Working_time'])[0]]
-            # self.values_wt = [env.values[i] for i in np.where(env.sensor_dic['Working_time'])[0]]
-            self.actions_wt = env.actions
-            self.wt_label = list(env.sensor_dic['Working_time'])
-            # rollout_buffer.reset(self.data_wt.shape[0])
+            self.values_wt = [env.values[i] for i in np.where(env.sensor_dic['Working_time'])[0]]
+            self.actions_wt = [env.actions[i] for i in np.where(env.sensor_dic['Working_time'])[0]]
+            rollout_buffer.reset(self.data_wt.shape[0])
 
             assert self.batch_size<env.sensor_dic.shape[0], f'Batch size should samller than {self.data_wt.shape[0]}'
 
             obs_nor = [env.observation_var[i] + '_nor' for i in range(len(env.observation_var))]
             _obs = np.array(self.data_wt[obs_nor])
-            # _terminal_state = np.array(self.data_wt['Terminations'])
+            _terminal_state = np.array(self.data_wt['Terminations'])
             _rewards = np.array(self.data_wt['rewards'])
             _actions = self.actions_wt
-            # _values = self.values_wt
+            _values = self.values_wt
             _log_probs = self.logprobs_wt 
-            performance = np.mean(self.data_wt['results'][np.where(env.sensor_dic['Working_time'])[0]])
-            training_data = [_obs, _actions, _rewards, _log_probs]
+            performance = np.mean(self.data_wt['results'])
+
             # index = random.randint(0, _obs.shape[0]-self.batch_size-1)
 
             # _terminal_state = _terminal_state[index:index+self.batch_size]
@@ -270,40 +264,37 @@ class OnPolicyAlgorithm(BaseAlgorithm):
 
             # Handle timeout by bootstraping with value function
             # see GitHub issue #633
-            # for idx, done in enumerate(_terminal_state):
-            #     if (
-            #         done
-            #         # and infos[idx].get("terminal_observation") is not None
-            #         # and infos[idx].get("TimeLimit.truncated", False)
-            #     ):
-            #         terminal_obs = torch.tensor(_obs[idx]).to('cuda').unsqueeze(0).float()
-            #         with th.no_grad():
-            #             terminal_value = self.policy.predict_values(terminal_obs)[0]  # type: ignore[arg-type]
-            #         _rewards[idx] += self.gamma * terminal_value
+            for idx, done in enumerate(_terminal_state):
+                if (
+                    done
+                    # and infos[idx].get("terminal_observation") is not None
+                    # and infos[idx].get("TimeLimit.truncated", False)
+                ):
+                    terminal_obs = torch.tensor(_obs[idx]).to('cuda').unsqueeze(0).float()
+                    with th.no_grad():
+                        terminal_value = self.policy.predict_values(terminal_obs)[0]  # type: ignore[arg-type]
+                    _rewards[idx] += self.gamma * terminal_value
 
-            # for k in range(_obs.shape[0]):
-            # rollout_buffer.add(
-            #     _obs,  # type: ignore[arg-type]
-            #     _actions,
-            #     _rewards,
-            #     # _terminal_state],  # type: ignore[arg-type]
-            #     # # self._last_episode_starts,  # type: ignore[arg-type]
-            #     # _values],
-            #     _log_probs,
-            # )
-            rollout_buffer.add(training_data, self.wt_label)
-            # a = rollout_buffer.get(12, 5)
-            self._last_obs = _obs[-1]  # type: ignore[assignment]
-            # self._last_episode_starts = _terminal_state[k]
+            for k in range(_obs.shape[0]):
+                rollout_buffer.add(
+                    _obs[k],  # type: ignore[arg-type]
+                    _actions[k].cpu().numpy(),
+                    _rewards[k],
+                    _terminal_state[k],  # type: ignore[arg-type]
+                    # self._last_episode_starts,  # type: ignore[arg-type]
+                    _values[k],
+                    _log_probs[k],
+                )
+            self._last_obs = _obs[k]  # type: ignore[assignment]
+            self._last_episode_starts = _terminal_state[k]
 
-        # with th.no_grad():
-        #     # Compute value for the last timestep
-        #     last_values = self.policy.predict_values(torch.tensor(self._last_obs).to('cuda').unsqueeze(0).float())
+        with th.no_grad():
+            # Compute value for the last timestep
+            last_values = self.policy.predict_values(torch.tensor(self._last_obs).to('cuda').unsqueeze(0).float())
 
-        # rollout_buffer.remove_tail(n_rollout_steps)
-        rollout_buffer.compute_returns(outlook_steps = 5, gamma = self.gamma)
+        rollout_buffer.remove_tail(n_rollout_steps)
+        rollout_buffer.compute_returns_and_advantage_seg(last_values=_values[rollout_buffer.buffer_size-1], dones=_terminal_state[rollout_buffer.buffer_size-1], step_length = n_rollout_steps)
         self.data_wt = self.data_wt[0:rollout_buffer.buffer_size]
-        rollout_buffer.remove_redundancy(rollout_buffer.wt_label)
         callback.update_locals(locals())
 
         callback.on_rollout_end()
@@ -364,7 +355,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         assert self.env is not None
 
         while self.num_timesteps < total_timesteps:
-            continue_training, performance = self.collect_rollouts(self.env, callback, self.rollout_buffer)
+            continue_training, performance = self.collect_rollouts(self.env, callback, self.rollout_buffer, n_rollout_steps=self.n_steps)
 
             if not continue_training:
                 break
@@ -377,7 +368,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
                 assert self.ep_info_buffer is not None
                 self._dump_logs(iteration)
 
-            self.env.p_loss, self.env.prob = self.train(max_train_perEp)
+            self.env.p_loss, self.env.v_loss, self.env.prob = self.train(max_train_perEp)
 
         callback.on_training_end()
 
