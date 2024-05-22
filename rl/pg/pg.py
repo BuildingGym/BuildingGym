@@ -201,9 +201,9 @@ class pg(OnPolicyAlgorithm):
             # Check gradient
             # for name, param in self.policy.mlp_extractor.named_parameters():
             # for name, param in self.policy.features_extractor.policy_fe.named_parameters():
-            for name, param in self.policy.action_network.named_parameters():
-                if param.requires_grad:
-                    print(f"{name}: {param.grad}")       
+            # for name, param in self.policy.action_network.named_parameters():
+            #     if param.requires_grad:
+            #         print(f"{name}: {param.grad}")       
             # Clip grad norm
             th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
             self.policy.optimizer.step()
