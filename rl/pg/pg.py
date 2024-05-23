@@ -146,13 +146,13 @@ class pg(OnPolicyAlgorithm):
         if _init_setup_model:
             self._setup_model()
 
-    def train(self, max_train_perEp = np.inf) -> None:
+    def train(self, obs, actions, returns) -> None:
         """
         Update policy using the currently gathered
         rollout buffer (one gradient step over whole data).
         """
         # Switch to train mode (this affects batch norm / dropout)
-        self.policy.set_training_mode(False)
+        self.policy.set_training_mode(True)
         # self.policy.action_network.train()
 
         # Update optimizer learning rate
@@ -160,55 +160,55 @@ class pg(OnPolicyAlgorithm):
 
 
         # for rollout_data in self.rollout_buffer.get(batch_size=self.batch_size):
-        for n_train in range(max_train_perEp):
+
         # for rollout_data in self.rollout_buffer.get(batch_size=None):
             # if n_train >= max_train_perEp:
             #     break
-            rollout_data = self.rollout_buffer.get(batch_size=self.batch_size, shuffle=self.args.shuffle)
-            actions = rollout_data[1]
-            if isinstance(self.action_space, spaces.Discrete):
-                # Convert discrete action from float to long
-                actions = actions.long().flatten()
+        # rollout_data = self.rollout_buffer.get(batch_size=self.batch_size, shuffle=self.args.shuffle)
+        actions = actions
+        if isinstance(self.action_space, spaces.Discrete):
+            # Convert discrete action from float to long
+            actions = actions.long().flatten()
 
-            log_prob, entropy = self.policy.evaluate_actions(rollout_data[0].float(), actions)
-            # for name, param in self.policy.named_parameters():
-            #     print(name, param.shape)            
-            # values, log_prob, entropy = rollout_data.old_log_prob
-            # values = values.flatten()
+        log_prob, entropy = self.policy.evaluate_actions(obs.float(), actions)
+        # for name, param in self.policy.named_parameters():
+        #     print(name, param.shape)            
+        # values, log_prob, entropy = rollout_data.old_log_prob
+        # values = values.flatten()
 
-            # Normalize advantage (not present in the original implementation)
-            advantages = rollout_data[4]
-            if self.normalize_advantage:
-                advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        # Normalize advantage (not present in the original implementation)
+        advantages = returns
+        if self.normalize_advantage:
+            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
-            # Policy gradient loss
-            policy_loss = -(advantages * log_prob)
+        # Policy gradient loss
+        policy_loss = -(advantages * log_prob)
 
-            # Value loss using the TD(gae_lambda) target
-            # value_loss = F.mse_loss(rollout_data.returns, values)
+        # Value loss using the TD(gae_lambda) target
+        # value_loss = F.mse_loss(rollout_data.returns, values)
 
-            # Entropy loss favor exploration
-            if entropy is None:
-                # Approximate entropy when no analytical form
-                entropy_loss = -th.mean(-log_prob)
-            else:
-                entropy_loss = -th.mean(entropy)
+        # Entropy loss favor exploration
+        if entropy is None:
+            # Approximate entropy when no analytical form
+            entropy_loss = -th.mean(-log_prob)
+        else:
+            entropy_loss = -th.mean(entropy)
 
-            loss = self.args.pol_coef * policy_loss + self.ent_coef * entropy_loss
+        loss = self.args.pol_coef * policy_loss + self.ent_coef * entropy_loss
 
-            # Optimization step
-            self.policy.optimizer.zero_grad()
-            loss.backward()
-            # Check gradient
-            # for name, param in self.policy.mlp_extractor.named_parameters():
-            # for name, param in self.policy.features_extractor.policy_fe.named_parameters():
-            # for name, param in self.policy.action_network.named_parameters():
-            #     if param.requires_grad:
-            #         print(f"{name}: {param.grad}")       
-            # Clip grad norm
-            th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
-            self.policy.optimizer.step()
-            # n_train+=1
+        # Optimization step
+        self.policy.optimizer.zero_grad()
+        loss.backward()
+        # Check gradient
+        # for name, param in self.policy.mlp_extractor.named_parameters():
+        # for name, param in self.policy.features_extractor.policy_fe.named_parameters():
+        # for name, param in self.policy.action_network.named_parameters():
+        #     if param.requires_grad:
+        #         print(f"{name}: {param.grad}")       
+        # Clip grad norm
+        th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
+        self.policy.optimizer.step()
+
 
         # explained_var = explained_variance(self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten())
 
@@ -221,7 +221,7 @@ class pg(OnPolicyAlgorithm):
         if hasattr(self.policy, "log_std"):
             self.logger.record("train/std", th.exp(self.policy.log_std).mean().item())
         # return policy_loss.item(), np.mean(self.rollout_buffer.logprobs[106])
-        return policy_loss.item(), self.rollout_buffer.logprobs[106]
+        return policy_loss.item()
 
 
     def learn(
