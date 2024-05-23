@@ -148,23 +148,23 @@ _, performance = a.learn(args.total_epoch, my_callback)
 
 # parameters_dict = {
 # 'learning_rate': {
-#     'values': [1e-6, 1e-4, 1e-2]
+#     'values': [1e-5, 1e-4]
 #     },
 # 'max_train_perEp': {
 #         'values': [1, 10, 100]
 #     },  
 # 'gamma': {
-#         'values': [0.1]
+#         'values': [0.5, 0.9]
 #     },         
-# 'n_steps': {
-#       'values': [32, 6]
+# 'batch_size': {
+#       'values': [64, 128]
 #     },     
 # # 'train_frequency': {
 # #       'values': [1, 5, 10]
 # #     },   
-# 'gae_lambda': {
-#       'values': [1, 0.1]
-#     },                                
+# # 'gae_lambda': {
+# #       'values': [1, 0.1]
+# #     },                                
 # }
 # sweep_config = {
 # 'method': 'random'

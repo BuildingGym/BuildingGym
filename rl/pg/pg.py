@@ -152,7 +152,8 @@ class pg(OnPolicyAlgorithm):
         rollout buffer (one gradient step over whole data).
         """
         # Switch to train mode (this affects batch norm / dropout)
-        self.policy.set_training_mode(True)
+        self.policy.set_training_mode(False)
+        # self.policy.action_network.train()
 
         # Update optimizer learning rate
         self._update_learning_rate(self.policy.optimizer)
@@ -181,7 +182,7 @@ class pg(OnPolicyAlgorithm):
                 advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
             # Policy gradient loss
-            policy_loss = -(advantages * log_prob).mean()
+            policy_loss = -(advantages * log_prob)
 
             # Value loss using the TD(gae_lambda) target
             # value_loss = F.mse_loss(rollout_data.returns, values)

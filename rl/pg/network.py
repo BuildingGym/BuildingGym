@@ -78,6 +78,10 @@ class Agent(nn.Module):
                 ),
             )
             net_arch = net_arch[0]
+        if type(self.action_space) == Discrete:
+            self.dist_type = 'categorical'
+        elif type(self.action_space) == Box:
+            self.dist_type = 'normal'
         self.action_dist = CategoricalDistribution(self.action_space.n)
         
         
@@ -99,6 +103,7 @@ class Agent(nn.Module):
         self.features_extractor = FEBuild_actor(
             self.observation_space.shape[0],
             Fe_arch = Fe_arch,
+            # activation_fn=self.activation_fn,
             device=self.device,
         )
         self.mlp_extractor = MlpBuild_actor(
@@ -146,7 +151,7 @@ class Agent(nn.Module):
         latent_pi = self.mlp_extractor(pi_features)
         # Evaluate the values for the given observations
         distribution = self._get_action_dist_from_latent(latent_pi)
-        actions = distribution.get_actions(deterministic=deterministic)
+        actions = distribution.sample()
         log_prob = distribution.log_prob(actions)
         # actions = actions.reshape((-1, *self.action_space.n)) 
         return actions, log_prob
@@ -161,21 +166,23 @@ class Agent(nn.Module):
         """
         mean_actions = self.action_network(latent_pi)
 
-        if isinstance(self.action_dist, DiagGaussianDistribution):
-            return self.action_dist.proba_distribution(mean_actions, self.log_std)
-        elif isinstance(self.action_dist, CategoricalDistribution):
-            # Here mean_actions are the logits before the softmax
-            return self.action_dist.proba_distribution(action_logits=mean_actions)
-        elif isinstance(self.action_dist, MultiCategoricalDistribution):
-            # Here mean_actions are the flattened logits
-            return self.action_dist.proba_distribution(action_logits=mean_actions)
-        elif isinstance(self.action_dist, BernoulliDistribution):
-            # Here mean_actions are the logits (before rounding to get the binary actions)
-            return self.action_dist.proba_distribution(action_logits=mean_actions)
-        elif isinstance(self.action_dist, StateDependentNoiseDistribution):
-            return self.action_dist.proba_distribution(mean_actions, self.log_std, latent_pi)
-        else:
-            raise ValueError("Invalid action distribution")
+        if self.dist_type == 'categorical':
+            return Categorical(mean_actions)
+        # if isinstance(self.action_dist, DiagGaussianDistribution):
+        #     return self.action_dist.proba_distribution(mean_actions, self.log_std)
+        # elif isinstance(self.action_dist, CategoricalDistribution):
+        #     # Here mean_actions are the logits before the softmax
+        #     return self.action_dist.proba_distribution(action_logits=mean_actions)
+        # elif isinstance(self.action_dist, MultiCategoricalDistribution):
+        #     # Here mean_actions are the flattened logits
+        #     return self.action_dist.proba_distribution(action_logits=mean_actions)
+        # elif isinstance(self.action_dist, BernoulliDistribution):
+        #     # Here mean_actions are the logits (before rounding to get the binary actions)
+        #     return self.action_dist.proba_distribution(action_logits=mean_actions)
+        # elif isinstance(self.action_dist, StateDependentNoiseDistribution):
+        #     return self.action_dist.proba_distribution(mean_actions, self.log_std, latent_pi)
+        # else:
+        #     raise ValueError("Invalid action distribution")
 
     def _predict(self, observation: PyTorchObs, deterministic: bool = False) -> th.Tensor:
         """
@@ -270,6 +277,7 @@ class Agent(nn.Module):
 
         # Setup optimizer with initial learning rate
         self.optimizer = self.optimizer_class(self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)  # type: ignore[call-arg]    
+        # self.optimizer =torch.optim.SGD(self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)  # type: ignore[call-arg]    
 
     def weights_init(self, m):
         if isinstance(m, nn.Linear):
@@ -280,7 +288,7 @@ class Agent(nn.Module):
     def init_weight(self, network):
         for m in network.modules():
             if isinstance(m, nn.Linear):
-                # nn.init.normal_(m.weight, mean=0, std=10)
-                nn.init.xavier_normal(m.weight, gain=1)
+                # nn.init.normal_(m.weight, mean=0, std=0.01)
+                nn.init.xavier_normal(m.weight, gain=2)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)    

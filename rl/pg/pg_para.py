@@ -29,11 +29,11 @@ class Args:
     n_time_step: int = 6
     """the number of steps in one hour"""    
 
-    learning_rate: float = 0.0001
+    learning_rate: float = 0.01
     shuffle: bool = True
-    batch_size: int = 256
+    batch_size: int = 1
     # n_steps: int = 2
-    gamma: float = 0.8
+    gamma: float = 0.9
     # gae_lambda: float = 1
     ent_coef: float = 0
     # vf_coef: float = 0.5
@@ -42,7 +42,7 @@ class Args:
     sde_sample_freq: int = -1
     # train_perEp: int = 1
     pol_coef: float = 1
-    total_epoch: int = 5000
+    total_epoch: int = 3000
     max_train_perEp: int = 1
     xa_init_gain: float = 1.
     optimizer_class: Type[th.optim.Optimizer] = th.optim.SGD
