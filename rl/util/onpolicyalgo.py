@@ -202,114 +202,115 @@ class OnPolicyAlgorithm(BaseAlgorithm):
                 self.policy.reset_noise(env.num_envs)
 
             env.run()
-            env.normalize_input()
-            env.label_working_time()
-            env.cal_r()
-            # env.cal_return()
+            # env.normalize_input()
+            # env.label_working_time()
+            n_steps+=1
+            # env.cal_r()
+            # # env.cal_return()
 
-            self.data_wt = env.sensor_dic
-            # self.logprobs_wt = env.logprobs[np.where(env.sensor_dic['Working_time'])[0]]
-            self.logprobs_wt = env.logprobs
-            # self.values_wt = env.values[np.where(env.sensor_dic['Working_time'])[0]]
-            # self.values_wt = [env.values[i] for i in np.where(env.sensor_dic['Working_time'])[0]]
-            self.actions_wt = env.actions
-            self.wt_label = list(env.sensor_dic['Working_time'])
-            # rollout_buffer.reset(self.data_wt.shape[0])
+            # self.data_wt = env.sensor_dic
+            # # self.logprobs_wt = env.logprobs[np.where(env.sensor_dic['Working_time'])[0]]
+            # self.logprobs_wt = env.logprobs
+            # # self.values_wt = env.values[np.where(env.sensor_dic['Working_time'])[0]]
+            # # self.values_wt = [env.values[i] for i in np.where(env.sensor_dic['Working_time'])[0]]
+            # self.actions_wt = env.actions
+            # self.wt_label = list(env.sensor_dic['Working_time'])
+            # # rollout_buffer.reset(self.data_wt.shape[0])
 
-            assert self.batch_size<env.sensor_dic.shape[0], f'Batch size should samller than {self.data_wt.shape[0]}'
+            # assert self.batch_size<env.sensor_dic.shape[0], f'Batch size should samller than {self.data_wt.shape[0]}'
 
-            obs_nor = [env.observation_var[i] + '_nor' for i in range(len(env.observation_var))]
-            _obs = np.array(self.data_wt[obs_nor])
-            # _terminal_state = np.array(self.data_wt['Terminations'])
-            _rewards = np.array(self.data_wt['rewards'])
-            _actions = self.actions_wt
-            # _values = self.values_wt
-            _log_probs = self.logprobs_wt 
-            performance = np.mean(self.data_wt['results'][np.where(env.sensor_dic['Working_time'])[0]])
-            if performance > 0.87:
-                path_i = os.path.join('Archive results', self.run_name)
-                os.mkdir(path_i)
-                env.sensor_dic.to_csv(os.path.join(path_i, 'results.csv'))
-                torch.save(self.policy.state_dict(), os.path.join(path_i, 'model.pth'))
-            training_data = [_obs, _actions, _rewards, _log_probs]
-            # index = random.randint(0, _obs.shape[0]-self.batch_size-1)
+            # obs_nor = [env.observation_var[i] + '_nor' for i in range(len(env.observation_var))]
+            # _obs = np.array(self.data_wt[obs_nor])
+            # # _terminal_state = np.array(self.data_wt['Terminations'])
+            # _rewards = np.array(self.data_wt['rewards'])
+            # _actions = self.actions_wt
+            # # _values = self.values_wt
+            # _log_probs = self.logprobs_wt 
+            performance = np.mean(env.sensor_dic['results'][np.where(env.sensor_dic['Working time'])[0]])
+        #     if performance > 0.87:
+        #         path_i = os.path.join('Archive results', self.run_name)
+        #         os.mkdir(path_i)
+        #         env.sensor_dic.to_csv(os.path.join(path_i, 'results.csv'))
+        #         torch.save(self.policy.state_dict(), os.path.join(path_i, 'model.pth'))
+        #     training_data = [_obs, _actions, _rewards, _log_probs]
+        #     # index = random.randint(0, _obs.shape[0]-self.batch_size-1)
 
-            # _terminal_state = _terminal_state[index:index+self.batch_size]
-            # _obs = _obs[index:index+self.batch_size,:]
-            # _rewards = _rewards[index:index+self.batch_size]
+        #     # _terminal_state = _terminal_state[index:index+self.batch_size]
+        #     # _obs = _obs[index:index+self.batch_size,:]
+        #     # _rewards = _rewards[index:index+self.batch_size]
 
 
-            # with th.no_grad():
-            #     # Convert to pytorch tensor or to TensorDict
-            #     obs_tensor = obs_as_tensor(_obs, self.device)
-            #     actions, values, log_probs = self.policy(obs_tensor.float())
-            # actions = actions.cpu().numpy()
+        #     # with th.no_grad():
+        #     #     # Convert to pytorch tensor or to TensorDict
+        #     #     obs_tensor = obs_as_tensor(_obs, self.device)
+        #     #     actions, values, log_probs = self.policy(obs_tensor.float())
+        #     # actions = actions.cpu().numpy()
 
-            # Rescale and perform action
-            # clipped_actions = actions
+        #     # Rescale and perform action
+        #     # clipped_actions = actions
 
-            if isinstance(self.action_space, spaces.Box):
-                if self.policy.squash_output:
-                    # Unscale the actions to match env bounds
-                    # if they were previously squashed (scaled in [-1, 1])
-                    clipped_actions = self.policy.unscale_action(clipped_actions)
-                else:
-                    # Otherwise, clip the actions to avoid out of bound error
-                    # as we are sampling from an unbounded Gaussian distribution
-                    clipped_actions = np.clip(actions, self.action_space.low, self.action_space.high)
+        #     if isinstance(self.action_space, spaces.Box):
+        #         if self.policy.squash_output:
+        #             # Unscale the actions to match env bounds
+        #             # if they were previously squashed (scaled in [-1, 1])
+        #             clipped_actions = self.policy.unscale_action(clipped_actions)
+        #         else:
+        #             # Otherwise, clip the actions to avoid out of bound error
+        #             # as we are sampling from an unbounded Gaussian distribution
+        #             clipped_actions = np.clip(actions, self.action_space.low, self.action_space.high)
 
-            # new_obs, rewards, dones, infos = env.step(clipped_actions)
+        #     # new_obs, rewards, dones, infos = env.step(clipped_actions)
 
-            self.num_timesteps += env.num_envs
+        #     self.num_timesteps += env.num_envs
 
-            # Give access to local variables
-            callback.update_locals(locals())
-            if not callback.on_step():
-                return False, performance
+        #     # Give access to local variables
+        #     callback.update_locals(locals())
+        #     if not callback.on_step():
+        #         return False, performance
 
-            # self._update_info_buffer(infos, dones)
-            n_steps += 1
+        #     # self._update_info_buffer(infos, dones)
+        #     n_steps += 1
 
-            # if isinstance(self.action_space, spaces.Discrete):
-            #     # Reshape in case of discrete action
-            #     actions = actions.reshape(-1, 1)
+        #     # if isinstance(self.action_space, spaces.Discrete):
+        #     #     # Reshape in case of discrete action
+        #     #     actions = actions.reshape(-1, 1)
 
-            # Handle timeout by bootstraping with value function
-            # see GitHub issue #633
-            # for idx, done in enumerate(_terminal_state):
-            #     if (
-            #         done
-            #         # and infos[idx].get("terminal_observation") is not None
-            #         # and infos[idx].get("TimeLimit.truncated", False)
-            #     ):
-            #         terminal_obs = torch.tensor(_obs[idx]).to('cuda').unsqueeze(0).float()
-            #         with th.no_grad():
-            #             terminal_value = self.policy.predict_values(terminal_obs)[0]  # type: ignore[arg-type]
-            #         _rewards[idx] += self.gamma * terminal_value
+        #     # Handle timeout by bootstraping with value function
+        #     # see GitHub issue #633
+        #     # for idx, done in enumerate(_terminal_state):
+        #     #     if (
+        #     #         done
+        #     #         # and infos[idx].get("terminal_observation") is not None
+        #     #         # and infos[idx].get("TimeLimit.truncated", False)
+        #     #     ):
+        #     #         terminal_obs = torch.tensor(_obs[idx]).to('cuda').unsqueeze(0).float()
+        #     #         with th.no_grad():
+        #     #             terminal_value = self.policy.predict_values(terminal_obs)[0]  # type: ignore[arg-type]
+        #     #         _rewards[idx] += self.gamma * terminal_value
 
-            # for k in range(_obs.shape[0]):
-            # rollout_buffer.add(
-            #     _obs,  # type: ignore[arg-type]
-            #     _actions,
-            #     _rewards,
-            #     # _terminal_state],  # type: ignore[arg-type]
-            #     # # self._last_episode_starts,  # type: ignore[arg-type]
-            #     # _values],
-            #     _log_probs,
-            # )
-            rollout_buffer.add(training_data, self.wt_label)
-            # a = rollout_buffer.get(12, 5)
-            self._last_obs = _obs[-1]  # type: ignore[assignment]
-            # self._last_episode_starts = _terminal_state[k]
+        #     # for k in range(_obs.shape[0]):
+        #     # rollout_buffer.add(
+        #     #     _obs,  # type: ignore[arg-type]
+        #     #     _actions,
+        #     #     _rewards,
+        #     #     # _terminal_state],  # type: ignore[arg-type]
+        #     #     # # self._last_episode_starts,  # type: ignore[arg-type]
+        #     #     # _values],
+        #     #     _log_probs,
+        #     # )
+        #     rollout_buffer.add(training_data, self.wt_label)
+        #     # a = rollout_buffer.get(12, 5)
+        #     self._last_obs = _obs[-1]  # type: ignore[assignment]
+        #     # self._last_episode_starts = _terminal_state[k]
 
-        # with th.no_grad():
-        #     # Compute value for the last timestep
-        #     last_values = self.policy.predict_values(torch.tensor(self._last_obs).to('cuda').unsqueeze(0).float())
+        # # with th.no_grad():
+        # #     # Compute value for the last timestep
+        # #     last_values = self.policy.predict_values(torch.tensor(self._last_obs).to('cuda').unsqueeze(0).float())
 
-        # rollout_buffer.remove_tail(n_rollout_steps)
-        rollout_buffer.compute_returns(outlook_steps = 5, gamma = self.gamma)
-        self.data_wt = self.data_wt[0:rollout_buffer.buffer_size]
-        rollout_buffer.remove_redundancy(rollout_buffer.wt_label)
+        # # rollout_buffer.remove_tail(n_rollout_steps)
+        # rollout_buffer.compute_returns(outlook_steps = 5, gamma = self.gamma)
+        # self.data_wt = self.data_wt[0:rollout_buffer.buffer_size]
+        # rollout_buffer.remove_redundancy(rollout_buffer.wt_label)
         callback.update_locals(locals())
 
         callback.on_rollout_end()
@@ -383,7 +384,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
                 assert self.ep_info_buffer is not None
                 self._dump_logs(iteration)
 
-            self.env.p_loss, self.env.prob = self.train(max_train_perEp)
+            # self.env.p_loss, self.env.prob = self.train(max_train_perEp)
 
         callback.on_training_end()
 

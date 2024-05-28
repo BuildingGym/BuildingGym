@@ -98,7 +98,6 @@ env = buildinggym_env('Large office - 1AV232 - Short.idf',
                     action_space,
                     input_sp.shape[0],
                     action_sp.n,
-                    agent,
                     Args)
 
 class callback(BaseCallback):
@@ -107,18 +106,25 @@ class callback(BaseCallback):
 
     def on_rollout_end(self) -> None:
         super().on_rollout_end()
-        if hasattr(self.model.env, 'p_loss'):
-            result = np.mean(self.model.data_wt['results'].iloc[np.where(env.sensor_dic['Working_time'])[0]])
-            reward = np.mean(self.model.data_wt['rewards'].iloc[np.where(env.sensor_dic['Working_time'])[0]])
-            p_loss = self.model.env.p_loss
-            # v_loss = self.model.env.v_loss
-            prob = self.model.env.prob
-            lr = self.model.learning_rate
-            wandb.log({'reward_curve': reward}, step=self.num_timesteps)        
-            wandb.log({'result_curve': result}, step=self.num_timesteps)        
-            wandb.log({'action prob': math.exp(prob)}, step=self.num_timesteps)        
-            wandb.log({'p_loss_curve': float(p_loss)}, step=self.num_timesteps)      
-            # wandb.log({'v_loss_curve': float(v_loss)}, step=self.num_timesteps)      
+        result = np.mean(self.model.env.sensor_dic['results'].iloc[np.where(env.sensor_dic['Working time'])[0]])
+        reward = np.mean(self.model.env.sensor_dic['rewards'].iloc[np.where(env.sensor_dic['Working time'])[0]])
+        prob = np.mean(np.exp(self.model.env.sensor_dic['logprobs'].iloc[np.where(env.sensor_dic['Working time'])[0]]))
+        p_loss = np.mean(self.model.env.loss_list)
+        # v_loss = self.model.env.v_loss
+        # prob = self.model.env.prob
+        lr = self.model.learning_rate
+        wandb.log({'reward_curve': reward}, step=self.num_timesteps)        
+        wandb.log({'result_curve': result}, step=self.num_timesteps)        
+        wandb.log({'action prob': prob}, step=self.num_timesteps)        
+        wandb.log({'p_loss_curve': float(p_loss)}, step=self.num_timesteps)      
+        # wandb.log({'v_loss_curve': float(v_loss)}, step=self.num_timesteps)      
+
+    def per_time_step(self, var = None) -> None:
+        # super().on_epoch_end()
+        if var is not None:
+            p_loss = var['loss'].item()
+            # wandb.log({'p_loss_curve': float(p_loss)}, step=self.num_timesteps)       
+
 
 my_callback = callback()
 args = tyro.cli(Args)
@@ -133,6 +139,7 @@ a = pg(Agent,
         policy_kwargs = {'optimizer_class': args.optimizer_class},
         max_train_perEp = args.max_train_perEp,
         )
+env.setup(algo=a)
 
 wandb.init(
     project=args.wandb_project_name,

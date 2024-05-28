@@ -289,6 +289,6 @@ class Agent(nn.Module):
         for m in network.modules():
             if isinstance(m, nn.Linear):
                 # nn.init.normal_(m.weight, mean=0, std=0.01)
-                nn.init.xavier_normal(m.weight, gain=2)
+                nn.init.orthogonal_(m.weight, gain=1)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)    

@@ -221,6 +221,8 @@ class pg(OnPolicyAlgorithm):
         if hasattr(self.policy, "log_std"):
             self.logger.record("train/std", th.exp(self.policy.log_std).mean().item())
         # return policy_loss.item(), np.mean(self.rollout_buffer.logprobs[106])
+        # self.my_callback.per_time_step(locals())
+
         return policy_loss.item()
 
 
