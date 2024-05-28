@@ -202,8 +202,11 @@ class buildinggym_env():
         min = time.minute
         idx = int(hour*6+int(min/10))
         baseline_i = baseline['Day_mean'].iloc[idx]
-        reward_i = max(round(0.3 - abs(data ** 2 - baseline_i ** 2)/baseline_i ** 2,2),-0.4)*5
+        # reward_i = max(round(0.3 - abs(data ** 2 - baseline_i ** 2)/baseline_i ** 2,2),-0.4)*5
         result_i = round(1 - abs(data - baseline_i)/baseline_i,2)
+        reward_i = result_i
+        if reward_i<0.85:
+            reward_i = reward_i**3
         return reward_i, result_i
     
     def cal_return(self, reward_list):
