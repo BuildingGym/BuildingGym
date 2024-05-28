@@ -34,7 +34,7 @@ class Args:
     shuffle: bool = True
     batch_size: int = 1
     # n_steps: int = 2
-    gamma: float = 0.9
+    gamma: float = 0.99
     # gae_lambda: float = 1
     ent_coef: float = 0
     # vf_coef: float = 0.5

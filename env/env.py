@@ -88,6 +88,7 @@ class buildinggym_env():
         self.ready_to_train = False
         self.args = tyro.cli(args)
         self.loss_list = []
+        self.success_n = 0
         self.simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
 
     def setup(self, algo):
@@ -205,8 +206,14 @@ class buildinggym_env():
         # reward_i = max(round(0.3 - abs(data ** 2 - baseline_i ** 2)/baseline_i ** 2,2),-0.4)*5
         result_i = round(1 - abs(data - baseline_i)/baseline_i,2)
         reward_i = result_i
+        if reward_i > 0.9:
+            self.success_n+=1
+        else:
+            self.success_n = 0
+        if self.success_n>=5:
+            reward_i+=3
         if reward_i<0.85:
-            reward_i = reward_i**3
+            reward_i = reward_i - 3
         return reward_i, result_i
     
     def cal_return(self, reward_list):
@@ -271,7 +278,7 @@ class buildinggym_env():
                     r_i = self.rewards[i]
                     logp_i = self.logprobs[i]
                     action_i = self.actions[i]
-                    R_i = self.cal_return(self.rewards[i:i+self.args.outlook_steps])
+                    R_i = self.cal_return(self.rewards[i:i+self.args.outlook_steps]) - 3
                     loss_i = self.algo.train(ob_i, action_i, R_i)
                     self.loss_list.append(loss_i)
 
