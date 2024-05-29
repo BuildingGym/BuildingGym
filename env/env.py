@@ -273,14 +273,15 @@ class buildinggym_env():
 
             if self.sensor_index > self.args.outlook_steps:
                 i = self.sensor_index-self.args.outlook_steps
-                if np.sum(self.sensor_dic['Working time'].iloc[i:self.sensor_index]) == self.args.outlook_steps:
-                    ob_i = self.states[i]
-                    r_i = self.rewards[i]
-                    logp_i = self.logprobs[i]
-                    action_i = self.actions[i]
-                    R_i = self.cal_return(self.rewards[i:i+self.args.outlook_steps]) - 3
-                    loss_i = self.algo.train(ob_i, action_i, R_i)
-                    self.loss_list.append(loss_i)
+                if i % self.args.step_size == 0:
+                    if np.sum(self.sensor_dic['Working time'].iloc[i:self.sensor_index]) == self.args.outlook_steps:
+                        ob_i = self.states[i]
+                        r_i = self.rewards[i]
+                        logp_i = self.logprobs[i]
+                        action_i = self.actions[i]
+                        R_i = self.cal_return(self.rewards[i:i+self.args.outlook_steps])
+                        loss_i = self.algo.train(ob_i, action_i, R_i)
+                        self.loss_list.append(loss_i)
 
 
             self.sensor_index+=1

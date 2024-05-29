@@ -29,8 +29,10 @@ class Args:
     n_time_step: int = 6
     """the number of steps in one hour"""    
 
-    learning_rate: float = 0.00007
-    outlook_steps: int = 5
+    learning_rate: float = 0.0005
+    alpha: float = 1
+    outlook_steps: int = 15
+    step_size: int = 20
     shuffle: bool = True
     batch_size: int = 1
     # n_steps: int = 2
@@ -46,5 +48,5 @@ class Args:
     total_epoch: int = 3000
     max_train_perEp: int = 1
     xa_init_gain: float = 1.
-    optimizer_class: Type[th.optim.Optimizer] = th.optim.SGD
+    optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam
 

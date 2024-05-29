@@ -29,7 +29,7 @@ from stable_baselines3.common.utils import (
     get_schedule_fn,
     get_system_info,
     set_random_seed,
-    update_learning_rate,
+    # update_learning_rate,
 )
 from stable_baselines3.common.vec_env import (
     DummyVecEnv,
@@ -286,7 +286,7 @@ class BaseAlgorithm(ABC):
         """
         self._current_progress_remaining = 1.0 - float(num_timesteps) / float(total_timesteps)
 
-    def _update_learning_rate(self, optimizers: Union[List[th.optim.Optimizer], th.optim.Optimizer]) -> None:
+    def _update_learning_rate(self, optimizers: Union[List[th.optim.Optimizer], th.optim.Optimizer], alpha:float) -> None:
         """
         Update the optimizers learning rate using the current learning rate schedule
         and the current progress remaining (from 1 to 0).
@@ -295,12 +295,16 @@ class BaseAlgorithm(ABC):
             An optimizer or a list of optimizers.
         """
         # Log the current learning rate
-        self.logger.record("train/learning_rate", self.lr_schedule(self._current_progress_remaining))
+        # self.logger.record("train/learning_rate", self.lr_schedule(self._current_progress_remaining))
 
         if not isinstance(optimizers, list):
             optimizers = [optimizers]
         for optimizer in optimizers:
-            update_learning_rate(optimizer, self.lr_schedule(self._current_progress_remaining))
+            self.update_learning_rate(optimizer, alpha)
+        
+    def update_learning_rate(self, optimizer, alpha):
+        for param_group in optimizer.param_groups:
+            param_group["lr"] = alpha*param_group["lr"] 
 
     def _excluded_save_params(self) -> List[str]:
         """

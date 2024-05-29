@@ -119,6 +119,7 @@ class pg(OnPolicyAlgorithm):
             # rollout_buffer_kwargs=rollout_buffer_kwargs,
             buffer_info = buffer_info,
             stats_window_size=stats_window_size,
+            args=self.args,
             tensorboard_log=tensorboard_log,
             policy_kwargs=policy_kwargs,
             verbose=verbose,
@@ -156,7 +157,7 @@ class pg(OnPolicyAlgorithm):
         # self.policy.action_network.train()
 
         # Update optimizer learning rate
-        self._update_learning_rate(self.policy.optimizer)
+        # self._update_learning_rate(self.policy.optimizer)
 
 
         # for rollout_data in self.rollout_buffer.get(batch_size=self.batch_size):

@@ -83,6 +83,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         # rollout_buffer_class: Optional[Type[RolloutBuffer]] = None,
         # rollout_buffer_kwargs: Optional[Dict[str, Any]] = None,
         stats_window_size: int = 100,
+        args = None,
         tensorboard_log: Optional[str] = None,
         monitor_wrapper: bool = True,
         policy_kwargs: Optional[Dict[str, Any]] = None,
@@ -200,8 +201,8 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             if self.use_sde and self.sde_sample_freq > 0 and n_steps % self.sde_sample_freq == 0:
                 # Sample a new noise matrix
                 self.policy.reset_noise(env.num_envs)
-
             env.run()
+            self._update_learning_rate(self.policy.optimizer, self.args.alpha)
             # env.normalize_input()
             # env.label_working_time()
             n_steps+=1
@@ -227,11 +228,11 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             # # _values = self.values_wt
             # _log_probs = self.logprobs_wt 
             performance = np.mean(env.sensor_dic['results'][np.where(env.sensor_dic['Working time'])[0]])
-        #     if performance > 0.87:
-        #         path_i = os.path.join('Archive results', self.run_name)
-        #         os.mkdir(path_i)
-        #         env.sensor_dic.to_csv(os.path.join(path_i, 'results.csv'))
-        #         torch.save(self.policy.state_dict(), os.path.join(path_i, 'model.pth'))
+            if performance > 0.87:
+                path_i = os.path.join('Archive results', self.run_name)
+                os.mkdir(path_i)
+                env.sensor_dic.to_csv(os.path.join(path_i, 'results.csv'))
+                torch.save(self.policy.state_dict(), os.path.join(path_i, 'model.pth'))
         #     training_data = [_obs, _actions, _rewards, _log_probs]
         #     # index = random.randint(0, _obs.shape[0]-self.batch_size-1)
 

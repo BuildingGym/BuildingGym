@@ -99,7 +99,7 @@ class Agent(nn.Module):
         self.net_arch = net_arch
 
         if Fe_arch is None:
-                Fe_arch = [128, 64]
+                Fe_arch = [32, 16]
         self.features_extractor = FEBuild_actor(
             self.observation_space.shape[0],
             Fe_arch = Fe_arch,
