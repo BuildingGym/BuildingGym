@@ -89,6 +89,10 @@ class buildinggym_env():
         self.args = tyro.cli(args)
         self.loss_list = []
         self.success_n = 0
+        self.batch_n = 0
+        self.obs_batch = torch.zeros(args.batch_size, observation_dim).to('cuda')
+        self.action_batch = torch.zeros(args.batch_size, 1).to('cuda')
+        self.return_batch = torch.zeros(args.batch_size, 1).to('cuda')
         self.simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
 
     def setup(self, algo):
@@ -280,8 +284,14 @@ class buildinggym_env():
                         logp_i = self.logprobs[i]
                         action_i = self.actions[i]
                         R_i = self.cal_return(self.rewards[i:i+self.args.outlook_steps])
-                        loss_i = self.algo.train(ob_i, action_i, R_i)
-                        self.loss_list.append(loss_i)
-
-
+                        if self.batch_n<self.args.batch_size:
+                            self.obs_batch[self.batch_n, :] = ob_i
+                            self.return_batch[self.batch_n, :] = R_i
+                            self.action_batch[self.batch_n, :] = action_i
+                            self.batch_n+=1
+                        else:
+                            self.batch_n=0
+                            loss_i = self.algo.train(self.obs_batch, self.action_batch, self.return_batch)
+                            self.loss_list.append(loss_i)
+                            
             self.sensor_index+=1

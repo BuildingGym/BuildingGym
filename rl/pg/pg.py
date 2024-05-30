@@ -183,6 +183,8 @@ class pg(OnPolicyAlgorithm):
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
         # Policy gradient loss
+        if log_prob.dim() == 1:
+            log_prob = log_prob.unsqueeze(1)
         policy_loss = -(advantages * log_prob)
 
         # Value loss using the TD(gae_lambda) target
@@ -195,7 +197,7 @@ class pg(OnPolicyAlgorithm):
         else:
             entropy_loss = -th.mean(entropy)
 
-        loss = self.args.pol_coef * policy_loss + self.ent_coef * entropy_loss
+        loss = self.args.pol_coef * policy_loss.mean() + self.ent_coef * entropy_loss
 
         # Optimization step
         self.policy.optimizer.zero_grad()
@@ -217,14 +219,14 @@ class pg(OnPolicyAlgorithm):
         self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
         # self.logger.record("train/explained_variance", explained_var)
         self.logger.record("train/entropy_loss", entropy_loss.item())
-        self.logger.record("train/policy_loss", policy_loss.item())
+        self.logger.record("train/policy_loss", policy_loss.mean().item())
         # self.logger.record("train/value_loss", value_loss.item())
         if hasattr(self.policy, "log_std"):
             self.logger.record("train/std", th.exp(self.policy.log_std).mean().item())
         # return policy_loss.item(), np.mean(self.rollout_buffer.logprobs[106])
         # self.my_callback.per_time_step(locals())
 
-        return policy_loss.item()
+        return policy_loss.mean().item()
 
 
     def learn(
