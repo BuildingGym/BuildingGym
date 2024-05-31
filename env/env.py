@@ -62,7 +62,7 @@ class buildinggym_env():
                  observation_space,
                  action_space,
                  observation_dim,
-                 action_dim,
+                 action_type,
                  args,
                  agent = None) -> None:
         global thinenv
@@ -80,7 +80,12 @@ class buildinggym_env():
         )
         # To update:
         self.observation_space = Box(np.array([-np.inf] * observation_dim), np.array([np.inf] * observation_dim))
-        self.action_space = Discrete(action_dim)
+        
+        if isinstance(action_type, Box):
+            self.action_space = Box(action_type.low, action_type.high)
+        if isinstance(action_space, Discrete):
+            self.action_space = Discrete(action_type.n)
+        
         self.observation_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
         self.action_var = ['Thermostat']
         self.num_envs = 1
@@ -207,17 +212,17 @@ class buildinggym_env():
         min = time.minute
         idx = int(hour*6+int(min/10))
         baseline_i = baseline['Day_mean'].iloc[idx]
-        # reward_i = max(round(0.3 - abs(data ** 2 - baseline_i ** 2)/baseline_i ** 2,2),-0.4)*5
+        reward_i = max(round(0.3 - abs(data ** 2 - baseline_i ** 2)/baseline_i ** 2,2),-0.4)*5
         result_i = round(1 - abs(data - baseline_i)/baseline_i,2)
-        reward_i = result_i
-        if reward_i > 0.9:
-            self.success_n+=1
-        else:
-            self.success_n = 0
-        if self.success_n>=5:
-            reward_i+=3
-        if reward_i<0.85:
-            reward_i = reward_i - 3
+        # reward_i = result_i
+        # if reward_i > 0.9:
+        #     self.success_n+=1
+        # else:
+        #     self.success_n = 0
+        # if self.success_n>=5:
+        #     reward_i+=3
+        # if reward_i<0.85:
+        #     reward_i = reward_i - 3
         return reward_i, result_i
     
     def cal_return(self, reward_list):
@@ -248,11 +253,11 @@ class buildinggym_env():
             obs = pd.DataFrame(obs, index = [self.sensor_index])                
             obs.insert(0, 'Time', t)
             obs.insert(1, 'Working time', self.label_working_time_i(t))            
-            obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', 23+actions.cpu().numpy())
+            obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', 23+4*actions.cpu().numpy())
             reward_i, result_i = self.cal_r_i(cooling_rate, t)
             obs['results'] = result_i
             obs['rewards'] = reward_i
-            obs.insert(obs.columns.get_loc("t_in") + 1, 'actions', actions.cpu().numpy())
+            obs.insert(obs.columns.get_loc("t_in") + 1, 'actions', 4*actions.cpu().numpy())
             obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().numpy())
 
 
@@ -271,9 +276,9 @@ class buildinggym_env():
                 self.actions.append(actions)
                 self.states.append(state)
                 self.rewards.append(reward_i)
-            actions = actions.cpu().numpy()
+            actions = 4*actions.cpu().numpy()
             com = 23. + actions
-            act = thinenv.act({'Thermostat': com})
+            act = thinenv.act({'Thermostat': max(min(com, 27), 23)})
 
             if self.sensor_index > self.args.outlook_steps:
                 i = self.sensor_index-self.args.outlook_steps

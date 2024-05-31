@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.distributions.categorical import Categorical
+from torch.distributions.normal import Normal
 import numpy as np
 from stable_baselines3.common.policies import BasePolicy
 import collections
@@ -53,7 +54,7 @@ class Agent(nn.Module):
                 net_arch: Optional[Union[List[int], Dict[str, List[int]]]] = None,
                 Fe_arch: Optional[Union[List[int], Dict[str, List[int]]]] = None,
                 optimizer_class: Type[th.optim.Optimizer] = th.optim.SGD,
-                activation_fn: Type[nn.Module] = nn.Tanh,
+                activation_fn: Type[nn.Module] = nn.ReLU,
                 extract_features_bool: bool = True,
                 share_features_extractor: bool = True,
                 device: Union[str, torch.device] = 'cuda',
@@ -78,11 +79,7 @@ class Agent(nn.Module):
                 ),
             )
             net_arch = net_arch[0]
-        if type(self.action_space) == Discrete:
-            self.dist_type = 'categorical'
-        elif type(self.action_space) == Box:
-            self.dist_type = 'normal'
-        self.action_dist = CategoricalDistribution(self.action_space.n)
+
         
         
         self.optimizer_class = optimizer_class
@@ -99,11 +96,11 @@ class Agent(nn.Module):
         self.net_arch = net_arch
 
         if Fe_arch is None:
-                Fe_arch = [32, 16]
+                Fe_arch = [16]
         self.features_extractor = FEBuild_actor(
             self.observation_space.shape[0],
             Fe_arch = Fe_arch,
-            # activation_fn=self.activation_fn,
+            activation_fn=self.activation_fn,
             device=self.device,
         )
         self.mlp_extractor = MlpBuild_actor(
@@ -113,13 +110,27 @@ class Agent(nn.Module):
             device=self.device,
         )
 
-        self.action_network = nn.Sequential(
-                                    nn.Linear(self.mlp_extractor.latent_dim_pi, self.action_space.n),
-                                    nn.Softmax(dim =-1),
-                                    ).to(self.device)
+        if type(self.action_space) == Discrete:
+            self.dist_type = 'categorical'
+            self.action_network = nn.Sequential(
+                                        nn.Linear(self.mlp_extractor.latent_dim_pi, self.action_space.n),
+                                        nn.Softmax(dim =-1),
+                                        ).to(self.device)            
+        elif type(self.action_space) == Box:
+            self.dist_type = 'normal'
+            self.action_network_mu = nn.Sequential(
+                                        nn.Linear(self.mlp_extractor.latent_dim_pi, 1),
+                                        nn.Sigmoid(),
+                                        ).to(self.device)       
+            self.action_network_logstd = nn.Sequential(
+                                        nn.Linear(self.mlp_extractor.latent_dim_pi, 1),
+                                        # nn.Sigmoid(),
+                                        ).to(self.device)                           
+        # self.action_dist = CategoricalDistribution(self.action_space.n)
       
         # self.xa_init_gain = xa_init_gain
-        self.init_weight(self.action_network)
+        self.init_weight(self.action_network_mu)
+        self.init_weight(self.action_network_logstd)
         self.init_weight(self.mlp_extractor.policy_net)
         
         self._build(lr_schedule)
@@ -164,10 +175,13 @@ class Agent(nn.Module):
         :param latent_pi: Latent code for the actor
         :return: Action distribution
         """
-        mean_actions = self.action_network(latent_pi)
+        mu = self.action_network_mu(latent_pi)
+        std = self.action_network_logstd(latent_pi).exp()
 
         if self.dist_type == 'categorical':
             return Categorical(mean_actions)
+        if self.dist_type == 'normal':
+            return Normal(mu.squeeze(), std.squeeze())
         # if isinstance(self.action_dist, DiagGaussianDistribution):
         #     return self.action_dist.proba_distribution(mean_actions, self.log_std)
         # elif isinstance(self.action_dist, CategoricalDistribution):
@@ -288,7 +302,7 @@ class Agent(nn.Module):
     def init_weight(self, network):
         for m in network.modules():
             if isinstance(m, nn.Linear):
-                # nn.init.normal_(m.weight, mean=0, std=0.01)
-                nn.init.orthogonal_(m.weight, gain=1)
+                nn.init.normal_(m.weight, mean=0, std=0.6)
+                # nn.init.orthogonal_(m.weight, gain=1)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)    
