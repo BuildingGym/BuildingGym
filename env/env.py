@@ -83,7 +83,7 @@ class buildinggym_env():
         
         if isinstance(action_type, Box):
             self.action_space = Box(action_type.low, action_type.high)
-        if isinstance(action_space, Discrete):
+        if isinstance(action_type, Discrete):
             self.action_space = Discrete(action_type.n)
         
         self.observation_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
@@ -165,10 +165,11 @@ class buildinggym_env():
         dt = int(60/self.args.n_time_step)
         dt = pd.to_timedelta(dt, unit='min')
         # end -= dt
+        day_of_week = t.weekday()
         h = t.hour
         m = t.minute
         t = pd.to_datetime(str(h)+':'+str(m), format='%H:%M')
-        if t >= start and t < end:
+        if t >= start and t < end and day_of_week<5:
             wt = True
         else:
             wt = False
@@ -223,7 +224,7 @@ class buildinggym_env():
         #     reward_i+=3
         # if reward_i<0.85:
         #     reward_i = reward_i - 3
-        return reward_i, result_i
+        return reward_i, result_i, baseline_i
     
     def cal_return(self, reward_list):
         R = 0
@@ -244,7 +245,7 @@ class buildinggym_env():
 
         if not warm_up:
             state = [float(obs[i]) for i in self.observation_var]
-            cooling_rate = obs['Chiller Electricity Rate'].item()
+            cooling_energy =  obs['Energy_1'].item() + obs['Energy_2'].item() + obs['Energy_3'].item() + obs['Energy_4'].item() + obs['Energy_5'].item()
             state = self.normalize_input_i(state)
             state = torch.Tensor(state).cuda() if torch.cuda.is_available() and self.args.cuda else torch.Tensor(state).cpu()
             with torch.no_grad():
@@ -252,12 +253,15 @@ class buildinggym_env():
                 # actions = torch.argmax(q_values, dim=0).cpu().numpy()
             obs = pd.DataFrame(obs, index = [self.sensor_index])                
             obs.insert(0, 'Time', t)
+            obs.insert(0, 'day_of_week', t.weekday())
             obs.insert(1, 'Working time', self.label_working_time_i(t))            
             obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', 23+4*actions.cpu().numpy())
-            reward_i, result_i = self.cal_r_i(cooling_rate, t)
+            reward_i, result_i, baseline_i = self.cal_r_i(cooling_energy, t)
+            obs['cooling_energy'] = cooling_energy
             obs['results'] = result_i
             obs['rewards'] = reward_i
-            obs.insert(obs.columns.get_loc("t_in") + 1, 'actions', 4*actions.cpu().numpy())
+            obs['baseline'] = baseline_i
+            obs.insert(obs.columns.get_loc("t_in") + 1, 'actions', actions.cpu().numpy())
             obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().numpy())
 
 
@@ -276,9 +280,10 @@ class buildinggym_env():
                 self.actions.append(actions)
                 self.states.append(state)
                 self.rewards.append(reward_i)
-            actions = 4*actions.cpu().numpy()
+            actions = actions.cpu().numpy()
             com = 23. + actions
             act = thinenv.act({'Thermostat': max(min(com, 27), 23)})
+            # act = thinenv.act({'Thermostat': 25})
 
             if self.sensor_index > self.args.outlook_steps:
                 i = self.sensor_index-self.args.outlook_steps

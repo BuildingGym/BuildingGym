@@ -124,13 +124,16 @@ class Agent(nn.Module):
                                         ).to(self.device)       
             self.action_network_logstd = nn.Sequential(
                                         nn.Linear(self.mlp_extractor.latent_dim_pi, 1),
-                                        # nn.Sigmoid(),
+                                        nn.Sigmoid(),
                                         ).to(self.device)                           
         # self.action_dist = CategoricalDistribution(self.action_space.n)
       
         # self.xa_init_gain = xa_init_gain
-        self.init_weight(self.action_network_mu)
-        self.init_weight(self.action_network_logstd)
+        if self.dist_type == 'categorical':
+            self.init_weight(self.action_network)
+        if self.dist_type == 'normal':
+            self.init_weight(self.action_network_mu)
+            self.init_weight(self.action_network_logstd)
         self.init_weight(self.mlp_extractor.policy_net)
         
         self._build(lr_schedule)
@@ -175,12 +178,14 @@ class Agent(nn.Module):
         :param latent_pi: Latent code for the actor
         :return: Action distribution
         """
-        mu = self.action_network_mu(latent_pi)
-        std = self.action_network_logstd(latent_pi).exp()
+
 
         if self.dist_type == 'categorical':
+            mean_actions = self.action_network(latent_pi)
             return Categorical(mean_actions)
         if self.dist_type == 'normal':
+            mu = self.action_network_mu(latent_pi)
+            std = self.action_network_logstd(latent_pi).exp()            
             return Normal(mu.squeeze(), std.squeeze())
         # if isinstance(self.action_dist, DiagGaussianDistribution):
         #     return self.action_dist.proba_distribution(mean_actions, self.log_std)
@@ -302,7 +307,7 @@ class Agent(nn.Module):
     def init_weight(self, network):
         for m in network.modules():
             if isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, mean=0, std=0.6)
-                # nn.init.orthogonal_(m.weight, gain=1)
+                # nn.init.normal_(m.weight, mean=0, std=0.1)
+                nn.init.orthogonal_(m.weight, gain=1)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)    

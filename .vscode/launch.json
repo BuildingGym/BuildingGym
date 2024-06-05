@@ -9,7 +9,7 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
-            "justMyCode": false,
+            "justMyCode": true,
             "console": "integratedTerminal"
         }
     ]

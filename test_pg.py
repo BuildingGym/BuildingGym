@@ -42,7 +42,7 @@ observation_space = _gymnasium_.spaces.Dict({
                 shape=(),
             ).bind(OutputVariable.Ref(
                 type='Zone Mean Air Temperature',
-                key='CORE_BOTTOM ZN',
+                key='Perimeter_ZN_1 ZN',
             )),
             'occ': VariableBox(
                 low=0, high=1,
@@ -50,7 +50,7 @@ observation_space = _gymnasium_.spaces.Dict({
                 shape=(),
             ).bind(OutputVariable.Ref(
                 type='Schedule Value',
-                key='Large Office Bldg Occ',
+                key='Small Office Bldg Occ',
             )),
             'light': VariableBox(
                 low=0, high=1,
@@ -58,7 +58,7 @@ observation_space = _gymnasium_.spaces.Dict({
                 shape=(),
             ).bind(OutputVariable.Ref(
                 type='Schedule Value',
-                key='Large Office Bldg Light',
+                key='Office Bldg Light',
             )),
             'Equip': VariableBox(
                 low=0, high=1,
@@ -66,16 +66,48 @@ observation_space = _gymnasium_.spaces.Dict({
                 shape=(),
             ).bind(OutputVariable.Ref(
                 type='Schedule Value',
-                key='Large Office Bldg Equip',
+                key='Small Office Bldg Equip',
             )),   
-            'Chiller Electricity Rate': VariableBox(
-                low=0, high=1000,
+            'Energy_1': VariableBox(
+                low=0, high=10000000,
                 dtype=_numpy_.float32,
                 shape=(),
             ).bind(OutputVariable.Ref(
-                type='Chiller Electricity Rate',
-                key='DOE REF 1980-2004 WATERCOOLED  CENTRIFUGAL CHILLER 0 1100TONS 0.7KW/TON',
+                type='Cooling Coil Total Cooling Rate',
+                key='CORE_ZN ZN PSZ-AC-1 1SPD DX AC CLG COIL 34KBTU/HR 9.7SEER',
             )),
+            'Energy_2': VariableBox(
+                low=0, high=10000000,
+                dtype=_numpy_.float32,
+                shape=(),
+            ).bind(OutputVariable.Ref(
+                type='Cooling Coil Total Cooling Rate',
+                key='PERIMETER_ZN_1 ZN PSZ-AC-2 1SPD DX AC CLG COIL 33KBTU/HR 9.7SEER',
+            )),
+            'Energy_3': VariableBox(
+                low=0, high=10000000,
+                dtype=_numpy_.float32,
+                shape=(),
+            ).bind(OutputVariable.Ref(
+                type='Cooling Coil Total Cooling Rate',
+                key='PERIMETER_ZN_2 ZN PSZ-AC-3 1SPD DX AC CLG COIL 23KBTU/HR 9.7SEER',
+            )),
+            'Energy_4': VariableBox(
+                low=0, high=10000000,
+                dtype=_numpy_.float32,
+                shape=(),
+            ).bind(OutputVariable.Ref(
+                type='Cooling Coil Total Cooling Rate',
+                key='PERIMETER_ZN_3 ZN PSZ-AC-4 1SPD DX AC CLG COIL 33KBTU/HR 9.7SEER',
+            )),
+            'Energy_5': VariableBox(
+                low=0, high=10000000,
+                dtype=_numpy_.float32,
+                shape=(),
+            ).bind(OutputVariable.Ref(
+                type='Cooling Coil Total Cooling Rate',
+                key='PERIMETER_ZN_4 ZN PSZ-AC-5 1SPD DX AC CLG COIL 25KBTU/HR 9.7SEER',
+            )),                                                
         })
 action_space = _gymnasium_.spaces.Dict({
                     'Thermostat': VariableBox(
@@ -85,18 +117,19 @@ action_space = _gymnasium_.spaces.Dict({
                     ).bind(Actuator.Ref(
                         type='Schedule:Compact',
                         control_type='Schedule Value',
-                        key='ANN-ctrl',
+                        key='Always 26',
                     ))
                 })
 schedule = ConstantSchedule(0.0001)
 input_sp = Box(np.array([0] * 5), np.array([1] * 5))
 action_sp = Box(np.array([0, -0.5]), np.array([1, 0.5]))
+action_sp = Discrete(5)
 if isinstance(action_sp, Discrete):
     action_dim = action_sp.n
 elif isinstance(action_sp, Box):
     action_dim = action_sp.shape[0]
 agent = Agent(input_sp, action_sp, schedule.value)
-env = buildinggym_env('Large office - 1AV232 - Short.idf',
+env = buildinggym_env('Small office-1A.idf',
                     'USA_FL_Miami.722020_TMY2.epw',
                     observation_space,
                     action_space,

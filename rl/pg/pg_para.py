@@ -22,21 +22,21 @@ class Args:
     """the entity (team) of wandb's project"""
 
 
-    work_time_start: str = '6:00'
+    work_time_start: str = '8:00'
     """the begining of working time"""
-    work_time_end: str = '22:00'
+    work_time_end: str = '19:00'
     """the end of working time"""   
     n_time_step: int = 6
     """the number of steps in one hour"""    
 
-    learning_rate: float = 0.0001
+    learning_rate: float = 0.001
     alpha: float = 0.97
-    outlook_steps: int = 5
-    step_size: int = 5
+    outlook_steps: int = 6
+    step_size: int = 6
     shuffle: bool = True
-    batch_size: int = 6
+    batch_size: int = 1
     # n_steps: int = 2
-    gamma: float = 0.9
+    gamma: float = 0.99
     # gae_lambda: float = 1
     ent_coef: float = 0
     # vf_coef: float = 0.5
