@@ -54,7 +54,7 @@ class Agent(nn.Module):
                 net_arch: Optional[Union[List[int], Dict[str, List[int]]]] = None,
                 Fe_arch: Optional[Union[List[int], Dict[str, List[int]]]] = None,
                 optimizer_class: Type[th.optim.Optimizer] = th.optim.SGD,
-                activation_fn: Type[nn.Module] = nn.ReLU,
+                activation_fn: Type[nn.Module] = nn.Tanh,
                 extract_features_bool: bool = True,
                 share_features_extractor: bool = True,
                 device: Union[str, torch.device] = 'cuda',
@@ -92,15 +92,15 @@ class Agent(nn.Module):
         self.lr_schedule = lr_schedule
         # Default network architecture, from stable-baselines
         if net_arch is None:
-                net_arch = dict(pi=[32])
+                net_arch = dict(pi=[32, 64])
         self.net_arch = net_arch
 
         if Fe_arch is None:
-                Fe_arch = [16]
+                Fe_arch = [64, 32]
         self.features_extractor = FEBuild_actor(
             self.observation_space.shape[0],
             Fe_arch = Fe_arch,
-            activation_fn=self.activation_fn,
+            # activation_fn=self.activation_fn,
             device=self.device,
         )
         self.mlp_extractor = MlpBuild_actor(
@@ -185,7 +185,7 @@ class Agent(nn.Module):
             return Categorical(mean_actions)
         if self.dist_type == 'normal':
             mu = self.action_network_mu(latent_pi)
-            std = self.action_network_logstd(latent_pi).exp()            
+            std = self.action_network_logstd(latent_pi)      
             return Normal(mu.squeeze(), std.squeeze())
         # if isinstance(self.action_dist, DiagGaussianDistribution):
         #     return self.action_dist.proba_distribution(mean_actions, self.log_std)
@@ -307,7 +307,7 @@ class Agent(nn.Module):
     def init_weight(self, network):
         for m in network.modules():
             if isinstance(m, nn.Linear):
-                # nn.init.normal_(m.weight, mean=0, std=0.1)
-                nn.init.orthogonal_(m.weight, gain=1)
+                nn.init.normal_(m.weight, mean=0, std=0.1)
+                # nn.init.orthogonal_(m.weight, gain=1)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)    

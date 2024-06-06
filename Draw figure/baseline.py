@@ -20,4 +20,21 @@ if __name__ == '__main__':
     plt.savefig('Figures\day_mean.png')
     day_mean = pd.DataFrame({'Time': ts, 'Day_mean':day_mean})
     day_mean.to_csv('Data\Day_mean.csv')
+
+    ratio = []
+    baseline = []
+    for i in range(results.shape[0]):
+        baseline.append(day_mean['Day_mean'].iloc[i%(24*6)])
+        ratio.append(1 - abs(results['cooling_energy'].iloc[i] - day_mean['Day_mean'].iloc[i%(24*6)])/ day_mean['Day_mean'].iloc[i%(24*6)])
+    results['baseline'] = baseline
+    results['ratio'] = ratio
+    results.to_csv('Data\\baseline-25-add-ratio.csv')
+    all_date = []
+    mean_ratio = []
+    for i in range(days):
+        date = results['Time'].iloc[i*144+1]
+        date = pd.to_datetime(date, format='%m/%d/%Y %H:%M').date()
+        all_date.append(date)
+        mean_ratio.append(np.mean(results['ratio'].iloc[(i*144+48):(i*144+114)]))
+    high = pd.DataFrame({'date':all_date, 'daily_ratio':mean_ratio}).to_csv('Data\High_ratio_list.csv')
     a = 1

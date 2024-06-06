@@ -123,7 +123,7 @@ action_space = _gymnasium_.spaces.Dict({
 schedule = ConstantSchedule(0.0001)
 input_sp = Box(np.array([0] * 5), np.array([1] * 5))
 action_sp = Box(np.array([0, -0.5]), np.array([1, 0.5]))
-action_sp = Discrete(5)
+# action_sp = Discrete(5)
 if isinstance(action_sp, Discrete):
     action_dim = action_sp.n
 elif isinstance(action_sp, Box):

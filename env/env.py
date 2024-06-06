@@ -99,6 +99,8 @@ class buildinggym_env():
         self.action_batch = torch.zeros(args.batch_size, 1).to('cuda')
         self.return_batch = torch.zeros(args.batch_size, 1).to('cuda')
         self.simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
+        self.baseline = pd.read_csv('Data\\Day_mean.csv')
+        # self.baseline['Time'] = pd.to_datetime(self.baseline['Time'], format='%m/%d/%Y %H:%M')
 
     def setup(self, algo):
         self.algo = algo
@@ -208,23 +210,23 @@ class buildinggym_env():
         self.sensor_dic['results'] = result
 
     def cal_r_i(self, data, time):
-        baseline = pd.read_csv('Data\Day_mean.csv')
+        # baseline = pd.read_csv('Data\Day_mean.csv')
         hour = time.hour
         min = time.minute
         idx = int(hour*6+int(min/10))
-        baseline_i = baseline['Day_mean'].iloc[idx]
-        reward_i = max(round(0.3 - abs(data ** 2 - baseline_i ** 2)/baseline_i ** 2,2),-0.4)*5
-        result_i = round(1 - abs(data - baseline_i)/baseline_i,2)
-        # reward_i = result_i
-        # if reward_i > 0.9:
-        #     self.success_n+=1
-        # else:
-        #     self.success_n = 0
-        # if self.success_n>=5:
-        #     reward_i+=3
-        # if reward_i<0.85:
-        #     reward_i = reward_i - 3
-        return reward_i, result_i, baseline_i
+        baseline_i = self.baseline['Day_mean'].iloc[idx]
+        # reward_i = max(round(0.3 - abs(data ** 2 - baseline_i ** 2)/baseline_i ** 2,2),-0.4)*5
+        # result_i = round(1 - abs(data - baseline_i)/baseline_i,2)
+        # return reward_i, result_i, baseline_i
+        # baseline_energy = self.baseline['cooling_energy'].iloc[idx]
+        actual_reduction = (baseline_i - data) / baseline_i
+        
+        # Target reduction percentage
+        target_reduction = 0.25
+        
+        energy_reward = 2 - abs(actual_reduction - target_reduction) * 10
+        return energy_reward, actual_reduction, baseline_i
+        
     
     def cal_return(self, reward_list):
         R = 0
@@ -281,19 +283,20 @@ class buildinggym_env():
                 self.states.append(state)
                 self.rewards.append(reward_i)
             actions = actions.cpu().numpy()
-            com = 23. + actions
+            com = 23. + actions * 4
             act = thinenv.act({'Thermostat': max(min(com, 27), 23)})
-            # act = thinenv.act({'Thermostat': 25})
+            # act = thinenv.act({'Thermostat': 27})
 
-            if self.sensor_index > self.args.outlook_steps:
-                i = self.sensor_index-self.args.outlook_steps
+            b  = self.args.outlook_steps + 1
+            if self.sensor_index > b:
+                i = self.sensor_index-b
                 if i % self.args.step_size == 0:
-                    if np.sum(self.sensor_dic['Working time'].iloc[i:self.sensor_index]) == self.args.outlook_steps:
+                    if np.sum(self.sensor_dic['Working time'].iloc[i:(self.sensor_index)]) == b:
                         ob_i = self.states[i]
                         r_i = self.rewards[i]
                         logp_i = self.logprobs[i]
                         action_i = self.actions[i]
-                        R_i = self.cal_return(self.rewards[i:i+self.args.outlook_steps])
+                        R_i = self.cal_return(self.rewards[i+1:i+b])
                         if self.batch_n<self.args.batch_size:
                             self.obs_batch[self.batch_n, :] = ob_i
                             self.return_batch[self.batch_n, :] = R_i
