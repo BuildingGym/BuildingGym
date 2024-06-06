@@ -151,9 +151,9 @@ class callback(BaseCallback):
         # prob = self.model.env.prob
         lr = self.model.learning_rate
         wandb.log({'reward_curve': reward}, step=self.num_timesteps)        
-        wandb.log({'result_curve': result}, step=self.num_timesteps)        
-        wandb.log({'action prob': prob}, step=self.num_timesteps)        
-        wandb.log({'p_loss_curve': float(p_loss)}, step=self.num_timesteps)      
+        wandb.log({'result_curve': result}, step=self.num_timesteps)
+        wandb.log({'action prob': prob}, step=self.num_timesteps)
+        wandb.log({'p_loss_curve': float(p_loss)}, step=self.num_timesteps)
         # wandb.log({'v_loss_curve': float(v_loss)}, step=self.num_timesteps)      
 
     def per_time_step(self, var = None) -> None:

@@ -92,7 +92,7 @@ class Agent(nn.Module):
         self.lr_schedule = lr_schedule
         # Default network architecture, from stable-baselines
         if net_arch is None:
-                net_arch = dict(pi=[32, 64])
+                net_arch = dict(pi=[32])
         self.net_arch = net_arch
 
         if Fe_arch is None:
