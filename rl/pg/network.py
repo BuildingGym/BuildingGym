@@ -92,11 +92,11 @@ class Agent(nn.Module):
         self.lr_schedule = lr_schedule
         # Default network architecture, from stable-baselines
         if net_arch is None:
-                net_arch = dict(pi=[32])
+                net_arch = dict(pi=[512, 128])
         self.net_arch = net_arch
 
         if Fe_arch is None:
-                Fe_arch = [64, 32]
+                Fe_arch = [1024]
         self.features_extractor = FEBuild_actor(
             self.observation_space.shape[0],
             Fe_arch = Fe_arch,
@@ -307,7 +307,7 @@ class Agent(nn.Module):
     def init_weight(self, network):
         for m in network.modules():
             if isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, mean=0, std=0.1)
+                nn.init.normal_(m.weight, mean=0, std=0.05)
                 # nn.init.orthogonal_(m.weight, gain=1)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)    

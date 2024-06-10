@@ -222,9 +222,12 @@ class buildinggym_env():
         actual_reduction = (baseline_i - data) / baseline_i
         
         # Target reduction percentage
-        target_reduction = 0.25
-        
-        energy_reward = 2 - abs(actual_reduction - target_reduction) * 10
+        target_reduction = 0.15
+
+        if actual_reduction>0.1 and actual_reduction<0.5:     
+            energy_reward = 1.5 - abs(actual_reduction - target_reduction) * 10
+        else:
+            energy_reward = -1.5 - abs(actual_reduction - target_reduction) * 10
         return energy_reward, actual_reduction, baseline_i
         
     
