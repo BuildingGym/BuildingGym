@@ -186,7 +186,7 @@ class Agent(nn.Module):
         if self.dist_type == 'normal':
             mu = self.action_network_mu(latent_pi)
             std = self.action_network_logstd(latent_pi)      
-            return Normal(mu.squeeze(), std.squeeze())
+            return Normal(mu.squeeze(), std.squeeze()*0.3)
         # if isinstance(self.action_dist, DiagGaussianDistribution):
         #     return self.action_dist.proba_distribution(mean_actions, self.log_std)
         # elif isinstance(self.action_dist, CategoricalDistribution):
