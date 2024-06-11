@@ -29,12 +29,12 @@ class Args:
     n_time_step: int = 6
     """the number of steps in one hour"""    
 
-    learning_rate: float = 0.0005
+    learning_rate: float = 0.001
     alpha: float = 0.98
     outlook_steps: int = 12
     step_size: int = 12
     shuffle: bool = True
-    batch_size: int = 2
+    batch_size: int = 24
     # n_steps: int = 2
     gamma: float = 0.9
     # gae_lambda: float = 1

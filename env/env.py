@@ -133,9 +133,12 @@ class buildinggym_env():
 
     def normalize_input_i(self, state):
         nor_min = np.array([22.8, 22, 0, 0, 0])
+        nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89])
+        std = np.array([2.17, 0.5, 0.39, 0.26, 0.26])
         # nor_min = np.array([0, 0, 0, 0, 0])
         nor_max = np.array([33.3, 27, 1, 1, 1])
         # nor_max = np.array([1, 1, 1, 1, 1])
+        return (state- nor_mean)/std
         return (state- nor_min)/(nor_max - nor_min)
         # return (state - np.array([27, 25, 0.5, 0.5, 0.5]))/np.array([3, 1, 0.2, 0.2, 0.2])
     
