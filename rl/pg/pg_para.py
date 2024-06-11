@@ -34,7 +34,7 @@ class Args:
     outlook_steps: int = 6
     step_size: int = 6
     shuffle: bool = True
-    batch_size: int = 24
+    batch_size: int = 1
     # n_steps: int = 2
     gamma: float = 0.9
     # gae_lambda: float = 1

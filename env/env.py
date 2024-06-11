@@ -228,9 +228,17 @@ class buildinggym_env():
         actual_reduction = (baseline_i - data) / baseline_i
         
         # Target reduction percentage
-        target_reduction = 0.25
+        target_reduction = 0.15
         
-        energy_reward = 2 - abs(actual_reduction - target_reduction) * 10
+        if abs(actual_reduction-target_reduction) < 0.05:
+            energy_reward = 5
+        elif abs(actual_reduction-target_reduction) < 0.15:
+            energy_reward = 2
+        else:
+            energy_reward = -1
+        # energy_reward = 1.5 - abs(actual_reduction - target_reduction) * 10
+        # if energy_reward<-5:
+        #     energy_reward = -5
         return energy_reward, actual_reduction, baseline_i
         
     
@@ -289,9 +297,9 @@ class buildinggym_env():
                 self.states.append(state)
                 self.rewards.append(reward_i)
             actions = actions.cpu().numpy()
-            com = 23. + actions * 4
+            com = 25. + actions * 2
             act = thinenv.act({'Thermostat': max(min(com, 27), 23)})
-            # act = thinenv.act({'Thermostat': 27})
+            act = thinenv.act({'Thermostat': 26})
 
             b  = self.args.outlook_steps + 1
             if self.sensor_index > b:

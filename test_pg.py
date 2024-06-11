@@ -195,7 +195,7 @@ _, performance = a.learn(args.total_epoch, my_callback)
 #     'values': [1e-5, 1e-4, 1e-3, 1e-2]
 #     },
 # 'alpha': {
-#         'values': [0.98, 0.9, 0.5]
+#         'values': [0.98, 0.9, 0.7]
 #     },  
 # 'outlook_steps': {
 #         'values': [12, 2, 6]
@@ -207,7 +207,7 @@ _, performance = a.learn(args.total_epoch, my_callback)
 #         'values': [0.5, 0.9, 0.99]
 #     },         
 # 'batch_size': {
-#       'values': [1]
+#       'values': [1, 24]
 #     },     
 # # 'train_frequency': {
 # #       'values': [1, 5, 10]
