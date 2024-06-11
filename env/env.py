@@ -299,7 +299,7 @@ class buildinggym_env():
             actions = actions.cpu().numpy()
             com = 25. + actions * 2
             act = thinenv.act({'Thermostat': max(min(com, 27), 23)})
-            act = thinenv.act({'Thermostat': 26})
+            # act = thinenv.act({'Thermostat': 26})
 
             b  = self.args.outlook_steps + 1
             if self.sensor_index > b:
