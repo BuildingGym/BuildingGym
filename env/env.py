@@ -115,12 +115,15 @@ class buildinggym_env():
 
     def normalize_input(self, data=None):
         nor_min = np.array([22.8, 22, 0, 0, 0])
+        nor_mean = np.array([28.7, 26, 0.77, 0.57, 0.9])
         # nor_min = np.array([0, 0, 0, 0, 0])
         nor_max = np.array([33.3, 27, 1, 1, 1])
+        std = np.array([2, 0.5, 0.4, 0.26, 0.26])
         # nor_max = np.array([1, 1, 1, 1, 1])
         if data == None:
             data = self.sensor_dic[self.observation_var]
-        nor_input = (data - nor_min)/(nor_max - nor_min)
+        # nor_input = (data - nor_min)/(nor_max - nor_min)
+        nor_input = (data - nor_mean)/std
         # nor_input = (data - np.array([27, 25, 0.5, 0.5, 0.5]))/np.array([3, 1, 0.2, 0.2, 0.2])
         j = 0
         for i in self.observation_var:
@@ -224,7 +227,7 @@ class buildinggym_env():
         # Target reduction percentage
         target_reduction = 0.15
 
-        if actual_reduction>0.1 and actual_reduction<0.5:     
+        if actual_reduction>0.1 and actual_reduction<0.3:     
             energy_reward = 1.5 - abs(actual_reduction - target_reduction) * 10
         else:
             energy_reward = -1.5 - abs(actual_reduction - target_reduction) * 10

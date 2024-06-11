@@ -240,7 +240,7 @@ class pg(OnPolicyAlgorithm):
         max_train_perEp: int = 100,
     ):
         _, performance =  super().learn(
-            total_timesteps=total_timesteps,
+            total_timesteps=self.args.total_epoch,
             callback=callback,
             log_interval=log_interval,
             tb_log_name=tb_log_name,
@@ -248,7 +248,7 @@ class pg(OnPolicyAlgorithm):
             progress_bar=progress_bar,
             max_train_perEp=self.max_train_perEp
         )
-        return performance
+        return _, performance
     
     def train_auto_fine_tune(self,
                              ):

@@ -227,8 +227,8 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             # _actions = self.actions_wt
             # # _values = self.values_wt
             # _log_probs = self.logprobs_wt 
-            performance = np.mean(env.sensor_dic['results'][np.where(env.sensor_dic['Working time'])[0]])
-            if performance > 0.9:
+            performance = np.mean(env.sensor_dic['rewards'][np.where(env.sensor_dic['Working time'])[0]])
+            if performance > 0.3:
                 path_i = os.path.join('Archive results', self.run_name)
                 if not os.path.exists(path_i):
                     os.mkdir(path_i) 
@@ -361,7 +361,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         iteration = 0
 
         total_timesteps, callback = self._setup_learn(
-            total_timesteps,
+            self.args.total_epoch,
             callback,
             reset_num_timesteps,
             tb_log_name,
@@ -379,6 +379,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
                 break
 
             iteration += 1
+            self.num_timesteps+=1
             self._update_current_progress_remaining(self.num_timesteps, total_timesteps)
 
             # Display training infos
