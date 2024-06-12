@@ -129,7 +129,7 @@ if isinstance(action_sp, Discrete):
 elif isinstance(action_sp, Box):
     action_dim = action_sp.shape[0]
 agent = Agent(input_sp, action_sp, schedule.value)
-env = buildinggym_env('Small office-1A.idf',
+env = buildinggym_env('Small office-1A-Long.idf',
                     'USA_FL_Miami.722020_TMY2.epw',
                     observation_space,
                     action_space,
