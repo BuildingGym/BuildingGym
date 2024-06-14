@@ -137,6 +137,11 @@ class Agent(nn.Module):
         self.init_weight(self.mlp_extractor.policy_net)
         
         self._build(lr_schedule)
+        self._load_pre_train(False)
+
+    def _load_pre_train(self, bool = False):
+        if bool:
+            self.load_state_dict(torch.load('Archive results\\0-pg-auto-important\\PG-v1__buildinggym-PG__1__1718099220\\model.pth'))
 
 
     def set_training_mode(self, mode = True):
