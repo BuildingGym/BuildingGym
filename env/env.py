@@ -222,6 +222,7 @@ class buildinggym_env():
         min = time.minute
         idx = int(hour*6+int(min/10))
         baseline_i = self.baseline['Day_mean'].iloc[idx]
+        baseline_i = 20000
         # reward_i = max(round(0.3 - abs(data ** 2 - baseline_i ** 2)/baseline_i ** 2,2),-0.4)*5
         # result_i = round(1 - abs(data - baseline_i)/baseline_i,2)
         # return reward_i, result_i, baseline_i
@@ -231,13 +232,13 @@ class buildinggym_env():
         # Target reduction percentage
         target_reduction = 0.15
         
-        if abs(actual_reduction-target_reduction) < 0.05:
-            energy_reward = 5
-        elif abs(actual_reduction-target_reduction) < 0.15:
-            energy_reward = 2
-        else:
-            energy_reward = -1
-        # energy_reward = 1.5 - abs(actual_reduction - target_reduction) * 10
+        # if abs(actual_reduction-target_reduction) < 0.05:
+        #     energy_reward = 5
+        # elif abs(actual_reduction-target_reduction) < 0.15:
+        #     energy_reward = 2
+        # else:
+        #     energy_reward = -1
+        energy_reward = 1.5 - abs(actual_reduction - target_reduction) * 10
         # if energy_reward<-5:
         #     energy_reward = -5
         return energy_reward, actual_reduction, baseline_i
@@ -270,7 +271,7 @@ class buildinggym_env():
                 # actions = torch.argmax(q_values, dim=0).cpu().numpy()
             self.com +=  (actions.cpu().item()-1)*0.5
             self.com = max(min(self.com, 27), 23)
-            # self.com = 25
+            # self.com = 26
             obs = pd.DataFrame(obs, index = [self.sensor_index])                
             obs.insert(0, 'Time', t)
             obs.insert(0, 'day_of_week', t.weekday())
