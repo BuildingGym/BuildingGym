@@ -122,8 +122,8 @@ action_space = _gymnasium_.spaces.Dict({
                 })
 schedule = ConstantSchedule(0.0001)
 input_sp = Box(np.array([0] * 5), np.array([1] * 5))
-action_sp = Box(np.array([0, -0.5]), np.array([1, 0.5]))
-# action_sp = Discrete(5)
+# action_sp = Box(np.array([0, -0.5]), np.array([1, 0.5]))
+action_sp = Discrete(3)
 if isinstance(action_sp, Discrete):
     action_dim = action_sp.n
 elif isinstance(action_sp, Box):
@@ -178,56 +178,56 @@ a = pg(Agent,
         )
 env.setup(algo=a)
 
-# wandb.init(
-#     project=args.wandb_project_name,
-#     entity=args.wandb_entity,
-#     sync_tensorboard=True,
-#     config=args,
-#     name=run_name,
-#     save_code=False,
-# )
-# _, performance = a.learn(args.total_epoch, my_callback)
+wandb.init(
+    project=args.wandb_project_name,
+    entity=args.wandb_entity,
+    sync_tensorboard=True,
+    config=args,
+    name=run_name,
+    save_code=False,
+)
+_, performance = a.learn(args.total_epoch, my_callback)
 
 
 
-parameters_dict = {
-'learning_rate': {
-    'values': [0.0004, 1e-4, 1e-3, 5e-5]
-    },
-'alpha': {
-        'values': [0.98, 0.95, 0.7]
-    },  
-'outlook_steps': {
-        'values': [12, 2, 6]
-    },  
-'step_size': {
-        'values': [12, 2, 6]
-    },          
-'gamma': {
-        'values': [0.5, 0.9, 0.99]
-    },         
-'batch_size': {
-      'values': [1, 12]
-    },     
-# 'train_frequency': {
-#       'values': [1, 5, 10]
-#     },   
-# 'gae_lambda': {
-#       'values': [1, 0.1]
-#     },                                
-}
-sweep_config = {
-'method': 'random'
-}
-metric = {
-'name': 'performance',
-'goal': 'maximize'   
-}
-sweep_config['metric'] = metric
-sweep_config['parameters'] = parameters_dict
+# parameters_dict = {
+# 'learning_rate': {
+#     'values': [0.0004, 1e-4, 1e-3, 5e-3]
+#     },
+# 'alpha': {
+#         'values': [0.98, 0.95, 0.7]
+#     },  
+# 'outlook_steps': {
+#         'values': [12, 2, 6]
+#     },  
+# 'step_size': {
+#         'values': [12, 2, 6]
+#     },          
+# 'gamma': {
+#         'values': [0.5, 0.9, 0.99]
+#     },         
+# 'batch_size': {
+#       'values': [16, 32]
+#     },     
+# # 'train_frequency': {
+# #       'values': [1, 5, 10]
+# #     },   
+# # 'gae_lambda': {
+# #       'values': [1, 0.1]
+# #     },                                
+# }
+# sweep_config = {
+# 'method': 'random'
+# }
+# metric = {
+# 'name': 'performance',
+# 'goal': 'maximize'   
+# }
+# sweep_config['metric'] = metric
+# sweep_config['parameters'] = parameters_dict
 
-sweep_id = wandb.sweep(sweep_config, project="pg-auto")
+# sweep_id = wandb.sweep(sweep_config, project="pg-auto")
 
-wandb.agent(sweep_id, a.train_auto_fine_tune, count=32) 
+# wandb.agent(sweep_id, a.train_auto_fine_tune, count=32) 
 
 dxl = 'success'

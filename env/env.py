@@ -100,6 +100,7 @@ class buildinggym_env():
         self.return_batch = torch.zeros(args.batch_size, 1).to('cuda')
         self.simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
         self.baseline = pd.read_csv('Data\\Day_mean.csv')
+        self.com = 25
         # self.baseline['Time'] = pd.to_datetime(self.baseline['Time'], format='%m/%d/%Y %H:%M')
 
     def setup(self, algo):
@@ -267,11 +268,14 @@ class buildinggym_env():
             with torch.no_grad():
                 actions, logprob = self.agent(state)
                 # actions = torch.argmax(q_values, dim=0).cpu().numpy()
+            self.com +=  (actions.cpu().item()-1)*0.5
+            self.com = max(min(self.com, 27), 23)
+            # self.com = 25
             obs = pd.DataFrame(obs, index = [self.sensor_index])                
             obs.insert(0, 'Time', t)
             obs.insert(0, 'day_of_week', t.weekday())
             obs.insert(1, 'Working time', self.label_working_time_i(t))            
-            obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', 23+4*actions.cpu().numpy())
+            obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', self.com)
             reward_i, result_i, baseline_i = self.cal_r_i(cooling_energy, t)
             obs['cooling_energy'] = cooling_energy
             obs['results'] = result_i
@@ -297,8 +301,8 @@ class buildinggym_env():
                 self.states.append(state)
                 self.rewards.append(reward_i)
             actions = actions.cpu().numpy()
-            com = 25. + actions * 2
-            act = thinenv.act({'Thermostat': max(min(com, 27), 23)})
+            # com = 25. + actions * 2
+            act = thinenv.act({'Thermostat': self.com})
             # act = thinenv.act({'Thermostat': 26})
 
             b  = self.args.outlook_steps + 1
