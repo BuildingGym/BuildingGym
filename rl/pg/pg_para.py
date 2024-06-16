@@ -29,24 +29,24 @@ class Args:
     n_time_step: int = 6
     """the number of steps in one hour"""    
 
-    learning_rate: float = 0.01
+    learning_rate: float = 0.001
     alpha: float = 0.9
-    outlook_steps: int = 2
+    outlook_steps: int = 12
     step_size: int = 2
     shuffle: bool = True
-    batch_size: int = 16
+    batch_size: int = 1
     # n_steps: int = 2
-    gamma: float = 0.9
+    gamma: float = 0.5
     # gae_lambda: float = 1
-    ent_coef: float = 0.01
+    ent_coef: float = 0.1
     # vf_coef: float = 0.5
     max_grad_norm: float = 50
     use_sde: bool = False
     sde_sample_freq: int = -1
     # train_perEp: int = 1
     pol_coef: float = 1
-    total_epoch: int = 150
+    total_epoch: int = 30
     max_train_perEp: int = 1
     xa_init_gain: float = 1.
-    optimizer_class: Type[th.optim.Optimizer] = th.optim.SGD
+    optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam
 

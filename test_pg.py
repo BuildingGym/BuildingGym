@@ -192,10 +192,10 @@ _, performance = a.learn(args.total_epoch, my_callback)
 
 # parameters_dict = {
 # 'learning_rate': {
-#     'values': [0.0004, 1e-4, 1e-3, 5e-3]
+#     'values': [0.01, 0.001, 0.005, 0.008]
 #     },
 # 'alpha': {
-#         'values': [0.98, 0.95, 0.7]
+#         'values': [0.98, 0.95, 0.9, 0.8]
 #     },  
 # 'outlook_steps': {
 #         'values': [12, 2, 6]
@@ -207,11 +207,11 @@ _, performance = a.learn(args.total_epoch, my_callback)
 #         'values': [0.5, 0.9, 0.99]
 #     },         
 # 'batch_size': {
-#       'values': [16, 32]
+#       'values': [16, 32, 1]
 #     },     
-# # 'train_frequency': {
-# #       'values': [1, 5, 10]
-# #     },   
+# 'ent_coef': {
+#       'values': [0.01, 0.05, 0.1, 0.5]
+#     },   
 # # 'gae_lambda': {
 # #       'values': [1, 0.1]
 # #     },                                
@@ -228,6 +228,6 @@ _, performance = a.learn(args.total_epoch, my_callback)
 
 # sweep_id = wandb.sweep(sweep_config, project="pg-auto")
 
-# wandb.agent(sweep_id, a.train_auto_fine_tune, count=32) 
+# wandb.agent(sweep_id, a.train_auto_fine_tune, count=50) 
 
 dxl = 'success'
