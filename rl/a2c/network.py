@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.distributions.categorical import Categorical
+from torch.distributions.normal import Normal
 import numpy as np
 from stable_baselines3.common.policies import BasePolicy
 import collections
@@ -13,6 +14,7 @@ from gymnasium.spaces import (
     Box,
     Discrete
 )
+import os
 import numpy as np
 import torch as th
 from gymnasium import spaces
@@ -67,7 +69,6 @@ class Agent(nn.Module):
         self.observation_space = observation_space
         self.action_space = action_space
         self.extract_features_bool = extract_features_bool
-        self.share_features_extractor = share_features_extractor
         self.device = device
         self.ortho_init = ortho_init
         if isinstance(net_arch, list) and len(net_arch) > 0 and isinstance(net_arch[0], dict):
@@ -79,7 +80,7 @@ class Agent(nn.Module):
                 ),
             )
             net_arch = net_arch[0]
-        self.action_dist = CategoricalDistribution(self.action_space.n)
+
         
         
         self.optimizer_class = optimizer_class
@@ -92,37 +93,61 @@ class Agent(nn.Module):
         self.lr_schedule = lr_schedule
         # Default network architecture, from stable-baselines
         if net_arch is None:
-                net_arch = dict(pi=[32], vf=[32, 32])
+                net_arch = dict(pi=[32], vf=[32])
         self.net_arch = net_arch
 
         if Fe_arch is None:
-                Fe_arch = [128, 64]
+                Fe_arch = [64, 32]
         self.features_extractor = FEBuild(
             self.observation_space.shape[0],
             Fe_arch = Fe_arch,
-            share_features_extractor = self.share_features_extractor,
+            share_features_extractor = share_features_extractor,
+            # activation_fn=self.activation_fn,
             device=self.device,
         )
         self.mlp_extractor = MlpBuild(
             self.features_extractor.latent_dim_pi,
             self.features_extractor.latent_dim_vf,
-            # self.action_space.n,
             net_arch=self.net_arch,
             activation_fn=self.activation_fn,
             device=self.device,
         )
 
-        self.action_network = nn.Sequential(
-                                    nn.Linear(self.mlp_extractor.latent_dim_pi, self.action_space.n),
-                                    nn.Softmax(dim =-1),
-                                    ).to(self.device)
+        if type(self.action_space) == Discrete:
+            self.dist_type = 'categorical'
+            self.action_network = nn.Sequential(
+                                        nn.Linear(self.mlp_extractor.latent_dim_pi, self.action_space.n),
+                                        nn.Softmax(dim =-1),
+                                        ).to(self.device)            
+        elif type(self.action_space) == Box:
+            self.dist_type = 'normal'
+            self.action_network_mu = nn.Sequential(
+                                        nn.Linear(self.mlp_extractor.latent_dim_pi, 1),
+                                        nn.Sigmoid(),
+                                        ).to(self.device)       
+            self.action_network_logstd = nn.Sequential(
+                                        nn.Linear(self.mlp_extractor.latent_dim_pi, 1),
+                                        nn.Sigmoid(),
+                                        ).to(self.device)                           
+        # self.action_dist = CategoricalDistribution(self.action_space.n)
+        self.value_network = nn.Linear(self.mlp_extractor.latent_dim_vf, 1)
       
         # self.xa_init_gain = xa_init_gain
-        self.init_weight(self.action_network)
+        if self.dist_type == 'categorical':
+            self.init_weight(self.action_network)
+        if self.dist_type == 'normal':
+            self.init_weight(self.action_network_mu)
+            self.init_weight(self.action_network_logstd)
         self.init_weight(self.mlp_extractor.policy_net)
+        self.init_weight(self.mlp_extractor.value_net)
+        self.init_weight(self.value_network)
         
-        self.value_network = nn.Linear(self.mlp_extractor.latent_dim_vf, 1, device=self.device)
         self._build(lr_schedule)
+        self._load_pre_train(None)
+
+    def _load_pre_train(self, pre_model: os.PathLike = None):
+        if pre_model is not None:
+            self.load_state_dict(torch.load(pre_model))
 
 
     def set_training_mode(self, mode = True):
@@ -141,22 +166,28 @@ class Agent(nn.Module):
         """
         # Preprocess the observation if needed
         if self.extract_features_bool:
+            # pi_features = self.features_extractor.extract_features(obs)
+            # if self.share_features_extractor:
             pi_features, vf_features = self.features_extractor.extract_features(obs)
         else:
-            pi_features = vf_features = obs
+            pi_features=vf_features = obs            
+        # else:
+        #     pi_features = obs
         # if self.share_features_extractor:
         #     latent_pi, latent_vf = self.features_extractor(features)
         # else:
         #     pi_features=vf_features = features
-        latent_pi = self.mlp_extractor.forward_actor(pi_features)
-        latent_vf = self.mlp_extractor.forward_critic(vf_features)
+        latent_pi = self.mlp_extractor.policy_net(pi_features)
         # Evaluate the values for the given observations
-        values = self.value_network(latent_vf)
         distribution = self._get_action_dist_from_latent(latent_pi)
-        actions = distribution.get_actions(deterministic=deterministic)
+        actions = distribution.sample()
         log_prob = distribution.log_prob(actions)
         # actions = actions.reshape((-1, *self.action_space.n)) 
-        return actions, values, log_prob
+
+        latent_vf = self.mlp_extractor.value_net(vf_features)
+        value = self.value_network(latent_vf)
+
+        return actions, value, log_prob
     
 
     def _get_action_dist_from_latent(self, latent_pi: th.Tensor) -> Distribution:
@@ -166,23 +197,30 @@ class Agent(nn.Module):
         :param latent_pi: Latent code for the actor
         :return: Action distribution
         """
-        mean_actions = self.action_network(latent_pi)
 
-        if isinstance(self.action_dist, DiagGaussianDistribution):
-            return self.action_dist.proba_distribution(mean_actions, self.log_std)
-        elif isinstance(self.action_dist, CategoricalDistribution):
-            # Here mean_actions are the logits before the softmax
-            return self.action_dist.proba_distribution(action_logits=mean_actions)
-        elif isinstance(self.action_dist, MultiCategoricalDistribution):
-            # Here mean_actions are the flattened logits
-            return self.action_dist.proba_distribution(action_logits=mean_actions)
-        elif isinstance(self.action_dist, BernoulliDistribution):
-            # Here mean_actions are the logits (before rounding to get the binary actions)
-            return self.action_dist.proba_distribution(action_logits=mean_actions)
-        elif isinstance(self.action_dist, StateDependentNoiseDistribution):
-            return self.action_dist.proba_distribution(mean_actions, self.log_std, latent_pi)
-        else:
-            raise ValueError("Invalid action distribution")
+
+        if self.dist_type == 'categorical':
+            mean_actions = self.action_network(latent_pi)
+            return Categorical(mean_actions)
+        if self.dist_type == 'normal':
+            mu = self.action_network_mu(latent_pi)
+            std = self.action_network_logstd(latent_pi)      
+            return Normal(mu.squeeze(), std.squeeze()*0.3)
+        # if isinstance(self.action_dist, DiagGaussianDistribution):
+        #     return self.action_dist.proba_distribution(mean_actions, self.log_std)
+        # elif isinstance(self.action_dist, CategoricalDistribution):
+        #     # Here mean_actions are the logits before the softmax
+        #     return self.action_dist.proba_distribution(action_logits=mean_actions)
+        # elif isinstance(self.action_dist, MultiCategoricalDistribution):
+        #     # Here mean_actions are the flattened logits
+        #     return self.action_dist.proba_distribution(action_logits=mean_actions)
+        # elif isinstance(self.action_dist, BernoulliDistribution):
+        #     # Here mean_actions are the logits (before rounding to get the binary actions)
+        #     return self.action_dist.proba_distribution(action_logits=mean_actions)
+        # elif isinstance(self.action_dist, StateDependentNoiseDistribution):
+        #     return self.action_dist.proba_distribution(mean_actions, self.log_std, latent_pi)
+        # else:
+        #     raise ValueError("Invalid action distribution")
 
     def _predict(self, observation: PyTorchObs, deterministic: bool = False) -> th.Tensor:
         """
@@ -206,22 +244,21 @@ class Agent(nn.Module):
         """
         # Preprocess the observation if needed
         if self.extract_features_bool:
-            features = self.features_extractor.extract_features(obs)
-        else:
-            features = obs
-        if self.share_features_extractor:
+            # pi_features = self.features_extractor.extract_features(obs)
+            # if self.share_features_extractor:
             pi_features, vf_features = self.features_extractor.extract_features(obs)
         else:
-            pi_features = features[0]
-            vf_features = features[1]
-        latent_pi = self.mlp_extractor.forward_actor(pi_features)
-        latent_vf = self.mlp_extractor.forward_critic(vf_features)
+            pi_features=vf_features = obs            
+        latent_pi = self.mlp_extractor.policy_net(pi_features)
         distribution = self._get_action_dist_from_latent(latent_pi)
+        actions = distribution.sample()
         log_prob = distribution.log_prob(actions)
-        values = self.value_network(latent_vf)
         entropy = distribution.entropy()
-        return values, log_prob, entropy
+        latent_vf = self.mlp_extractor.value_net(vf_features)
+        value = self.value_network(latent_vf)
 
+        return value, log_prob, entropy
+    
     def get_distribution(self, obs: PyTorchObs) -> Distribution:
         """
         Get the current policy distribution given the observations.
@@ -230,26 +267,26 @@ class Agent(nn.Module):
         :return: the action distribution.
         """
         if self.extract_features_bool:
-            features = self.features_extractor.extract_features(obs)
+            pi_features, _ = self.features_extractor.extract_features(obs)
         else:
-            features = obs
-        latent_pi = self.mlp_extractor.forward_actor(features[0])
+            pi_features, _ = obs
+        latent_pi = self.mlp_extractor(pi_features)
         return self._get_action_dist_from_latent(latent_pi)
-
-    def predict_values(self, obs: PyTorchObs) -> th.Tensor:
-        """
-        Get the estimated values according to the current policy given the observations.
-
-        :param obs: Observation
-        :return: the estimated values.
-        """
-        if self.extract_features_bool:
-            features = self.features_extractor.extract_features(obs)
-        else:
-            features = obs
-        latent_vf = self.mlp_extractor.forward_critic(features[1])
-        return self.value_network(latent_vf)           
     
+    def predict_values(self, obs: PyTorchObs) -> th.Tensor:
+
+        if self.extract_features_bool:
+            # pi_features = self.features_extractor.extract_features(obs)
+            # if self.share_features_extractor:
+            _, vf_features = self.features_extractor.extract_features(obs)
+        else:
+            vf_features = obs            
+
+        latent_vf = self.mlp_extractor.value_net(vf_features)
+        value = self.value_network(latent_vf)
+        return value  
+
+      
     def _build(self, lr_schedule: Schedule) -> None:
         """
         Create the networks and the optimizer.
@@ -285,21 +322,14 @@ class Agent(nn.Module):
                 self.features_extractor: np.sqrt(2),
                 self.mlp_extractor: np.sqrt(2),
                 self.action_network: 0.1,
-                self.value_network: 10,
             }
-            if not self.share_features_extractor:
-                # Note(antonin): this is to keep SB3 results
-                # consistent, see GH#1148
-                if self.extract_features_bool:
-                    del module_gains[self.features_extractor]
-                    module_gains[self.pi_features_extractor] = np.sqrt(2)
-                    module_gains[self.vf_features_extractor] = np.sqrt(2)
-
+            
             for module, gain in module_gains.items():
                 module.apply(partial(self.init_weights, gain=gain))
 
         # Setup optimizer with initial learning rate
         self.optimizer = self.optimizer_class(self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)  # type: ignore[call-arg]    
+        # self.optimizer =torch.optim.SGD(self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)  # type: ignore[call-arg]    
 
     def weights_init(self, m):
         if isinstance(m, nn.Linear):
@@ -310,7 +340,7 @@ class Agent(nn.Module):
     def init_weight(self, network):
         for m in network.modules():
             if isinstance(m, nn.Linear):
-                # nn.init.normal_(m.weight, mean=0, std=10)
-                nn.init.xavier_normal(m.weight, gain=1)
+                nn.init.normal_(m.weight, mean=0, std=0.1)
+                # nn.init.orthogonal_(m.weight, gain=1)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)    

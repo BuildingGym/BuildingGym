@@ -30,6 +30,9 @@ class Args:
     """the number of steps in one hour"""    
 
     learning_rate: float = 0.01
+    alpha: float = 0.9
+    outlook_steps: int = 12
+    step_size: int = 2
     batch_size: int = 12
     n_steps: int = 2
     gamma: float = 0.1
@@ -41,7 +44,7 @@ class Args:
     sde_sample_freq: int = -1
     # train_perEp: int = 1
     pol_coef: float = 1
-    total_epoch: int = 5000
+    total_epoch: int = 1
     max_train_perEp: int = 1
     xa_init_gain: float = 1.
     optimizer_class: Type[th.optim.Optimizer] = th.optim.RMSprop

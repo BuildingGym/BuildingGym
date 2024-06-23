@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Dict, Optional, Type, TypeVar, Union
+from typing import Any, ClassVar, Dict, Optional, Type, TypeVar, Union, List
 from rl.a2c.a2c_para import Args
 import torch as th
 from gymnasium import spaces
@@ -86,6 +86,7 @@ class A2C(OnPolicyAlgorithm):
         use_rms_prop: bool = True,
         use_sde: bool = False,
         sde_sample_freq: int = -1,
+        buffer_info: List[str] = ['observations', 'actions', 'rewards', 'logprobs'],
         rollout_buffer_class: Optional[Type[RolloutBuffer]] = None,
         rollout_buffer_kwargs: Optional[Dict[str, Any]] = None,
         normalize_advantage: bool = False,
@@ -104,18 +105,20 @@ class A2C(OnPolicyAlgorithm):
             policy,
             env,
             learning_rate=self.args.learning_rate,
-            n_steps=self.args.n_steps,
-            batch_size = batch_size,
+            # n_steps=self.args.n_steps,
+            batch_size = args.batch_size,
             gamma=self.args.gamma,
-            gae_lambda=self.args.gae_lambda,
+            # gae_lambda=self.args.gae_lambda,
             ent_coef=self.args.ent_coef,
-            vf_coef=self.args.vf_coef,
+            # vf_coef=self.args.vf_coef,
             max_grad_norm=self.args.max_grad_norm,
             use_sde=self.args.use_sde,
             sde_sample_freq=self.args.sde_sample_freq,
-            rollout_buffer_class=rollout_buffer_class,
-            rollout_buffer_kwargs=rollout_buffer_kwargs,
+            # rollout_buffer_class=rollout_buffer_class,
+            # rollout_buffer_kwargs=rollout_buffer_kwargs,
+            buffer_info = buffer_info,
             stats_window_size=stats_window_size,
+            args=self.args,
             tensorboard_log=tensorboard_log,
             policy_kwargs=policy_kwargs,
             verbose=verbose,
@@ -143,7 +146,7 @@ class A2C(OnPolicyAlgorithm):
         if _init_setup_model:
             self._setup_model()
 
-    def train(self, max_train_perEp = np.inf) -> None:
+    def train(self, obs, actions, returns) -> None:
         """
         Update policy using the currently gathered
         rollout buffer (one gradient step over whole data).
@@ -152,69 +155,67 @@ class A2C(OnPolicyAlgorithm):
         self.policy.set_training_mode(True)
 
         # Update optimizer learning rate
-        self._update_learning_rate(self.policy.optimizer)
+        # self._update_learning_rate(self.policy.optimizer)
 
         # This will only loop once (get all data in one go)
         n_train = 0
         # for rollout_data in self.rollout_buffer.get(batch_size=self.batch_size):
-        for rollout_data in self.rollout_buffer.get(batch_size=None):
-            if n_train >= max_train_perEp:
-                break
-            actions = rollout_data.actions
-            if isinstance(self.action_space, spaces.Discrete):
-                # Convert discrete action from float to long
-                actions = actions.long().flatten()
 
-            values, log_prob, entropy = self.policy.evaluate_actions(rollout_data.observations, actions)
-            # for name, param in self.policy.named_parameters():
-            #     print(name, param.shape)            
-            # values, log_prob, entropy = rollout_data.old_log_prob
-            values = values.flatten()
+        actions = actions
+        if isinstance(self.action_space, spaces.Discrete):
+            # Convert discrete action from float to long
+            actions = actions.long().flatten()
 
-            # Normalize advantage (not present in the original implementation)
-            advantages = rollout_data.advantages
-            if self.normalize_advantage:
-                advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        values, log_prob, entropy = self.policy.evaluate_actions(obs, actions)
+        # for name, param in self.policy.named_parameters():
+        #     print(name, param.shape)            
+        # values, log_prob, entropy = rollout_data.old_log_prob
+        values = values.flatten()
 
-            # Policy gradient loss
-            policy_loss = -(1*advantages * log_prob).mean()
+        # Normalize advantage (not present in the original implementation)
+        advantages = returns
+        if self.normalize_advantage:
+            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
-            # Value loss using the TD(gae_lambda) target
-            value_loss = F.mse_loss(rollout_data.returns, values)
+        # Policy gradient loss
+        policy_loss = -(advantages * log_prob).mean()
 
-            # Entropy loss favor exploration
-            if entropy is None:
-                # Approximate entropy when no analytical form
-                entropy_loss = -th.mean(-log_prob)
-            else:
-                entropy_loss = -th.mean(entropy)
+        # Value loss using the TD(gae_lambda) target
+        value_loss = F.mse_loss(returns.squeeze(), values)
 
-            loss = self.args.pol_coef * policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
+        # Entropy loss favor exploration
+        if entropy is None:
+            # Approximate entropy when no analytical form
+            entropy_loss = -th.mean(-log_prob)
+        else:
+            entropy_loss = -th.mean(entropy)
 
-            # Optimization step
-            self.policy.optimizer.zero_grad()
-            loss.backward()
-            # Check gradient
-            # for name, param in self.policy.mlp_extractor.named_parameters():
-            for name, param in self.policy.features_extractor.policy_fe.named_parameters():
-                if param.requires_grad:
-                    print(f"{name}: {param.grad}")       
-            # Clip grad norm
-            th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
-            self.policy.optimizer.step()
-            n_train+=1
+        loss = self.args.pol_coef * policy_loss + self.ent_coef * entropy_loss + self.args.vf_coef * value_loss
 
-        explained_var = explained_variance(self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten())
+        # Optimization step
+        self.policy.optimizer.zero_grad()
+        loss.backward()
+        # Check gradient
+        # for name, param in self.policy.mlp_extractor.named_parameters():
+        # for name, param in self.policy.features_extractor.policy_fe.named_parameters():
+        #     if param.requires_grad:
+        #         print(f"{name}: {param.grad}")       
+        # Clip grad norm
+        th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
+        self.policy.optimizer.step()
+        n_train+=1
+
+        # explained_var = explained_variance(self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten())
 
         self._n_updates += 1
         self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
-        self.logger.record("train/explained_variance", explained_var)
+        # self.logger.record("train/explained_variance", explained_var)
         self.logger.record("train/entropy_loss", entropy_loss.item())
         self.logger.record("train/policy_loss", policy_loss.item())
         self.logger.record("train/value_loss", value_loss.item())
         if hasattr(self.policy, "log_std"):
             self.logger.record("train/std", th.exp(self.policy.log_std).mean().item())
-        return policy_loss.item(), value_loss.item(), np.mean(self.rollout_buffer.log_probs[106])
+        return policy_loss.mean().item(), value_loss.mean().item()
 
 
     def learn(
@@ -236,7 +237,7 @@ class A2C(OnPolicyAlgorithm):
             progress_bar=progress_bar,
             max_train_perEp=self.max_train_perEp
         )
-        return performance
+        return _, performance
     
     def train_auto_fine_tune(self,
                              ):

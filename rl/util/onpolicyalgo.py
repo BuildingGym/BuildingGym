@@ -113,6 +113,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
 
         # self.n_steps = n_steps
         self.gamma = gamma
+        self.args = args
         # self.gae_lambda = gae_lambda
         self.ent_coef = ent_coef
         # self.vf_coef = vf_coef
@@ -145,7 +146,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         #     **self.rollout_buffer_kwargs,
         # )
 
-        self.rollout_buffer = ReplayBuffer(self.buffer_info)
+        # self.rollout_buffer = ReplayBuffer(self.buffer_info, args=self.args)
         
         self.policy = self.policy_class(  # type: ignore[assignment]
             self.observation_space, self.action_space, self.lr_schedule, use_sde=self.use_sde, **self.policy_kwargs
@@ -168,7 +169,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         self,
         env: buildinggym_env,
         callback: BaseCallback,
-        rollout_buffer: ReplayBuffer,
+        rollout_buffer: ReplayBuffer = None,
         n_rollout_steps: Union[int, None] = None,
     ) -> bool:
         """
@@ -373,7 +374,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         assert self.env is not None
 
         while self.num_timesteps < total_timesteps:
-            continue_training, performance = self.collect_rollouts(self.env, callback, self.rollout_buffer)
+            continue_training, performance = self.collect_rollouts(self.env, callback)
 
             if not continue_training:
                 break

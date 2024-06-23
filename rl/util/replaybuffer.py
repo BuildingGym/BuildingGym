@@ -55,15 +55,22 @@ class ReplayBuffer():
         # observation_space: spaces.Space,
         # action_space: spaces.Space,
         info: List[str],
+        args: None,
         device: Union[th.device, str] = "cuda",
         n_envs: int = 1,
         optimize_memory_usage: bool = False,
         handle_timeout_termination: bool = True,
     ):
         # super().__init__(buffer_size, observation_space, action_space, device, n_envs)
+        self.args = args
         self.info = info
         self.device = device
         self.n_envs = n_envs
+        self._reset()
+
+    def reset(self):
+        self.returns = [0]*self.args.batch_size
+        self.advantages = [0]*self.args.batch_size
         self._reset()
 
     def _reset(self):
@@ -75,20 +82,39 @@ class ReplayBuffer():
 
     def get(self, batch_size = None, start_idx = None, shuffle = False):
 
-        # Return everything, don't create minibatches
         if batch_size is None:
             batch_size = self.buffer_size * self.n_envs
         if not shuffle:
             if start_idx is None:
-                start_idx = random.randint(0, self.buffer_size-batch_size)
+                start_idx = 0
             assert start_idx<=self.buffer_size-batch_size
-
-            return self._get_samples(np.arange(start_idx, start_idx + batch_size))
+            idx = np.arange(start_idx, start_idx + batch_size)
+            return self._get_samples(idx),torch.stack(tuple([self.returns[i] for i in idx])), torch.stack(tuple([self.advantages[i] for i in idx]))
         else:
             idx = []
             while len(idx)<batch_size:
                 idx.append(random.randint(0, self.buffer_size-1))
-            return self._get_samples(np.array(idx))
+            return self._get_samples(np.array(idx)), torch.stack(tuple([self.returns[i] for i in idx])), torch.stack(tuple([self.advantages[i] for i in idx]))
+        
+    def cal_R_adv(self):
+        # Convert to numpy
+        # last_values = last_values.clone().cpu().numpy().flatten()
+        assert 'values' in self.info
+        self.advantages = [0]*self.buffer_size
+        last_gae_lam = 0
+        for step in reversed(range(self.buffer_size)):
+            if step == self.buffer_size - 1:
+                next_non_terminal = 0
+                next_values = 0
+            else:
+                next_non_terminal = 1
+                next_values = self.values[step + 1]
+            delta = self.rewards[step] + self.args.gamma * next_values * next_non_terminal - self.values[step]
+            last_gae_lam = delta + self.args.gamma * self.args.gae_lambda * next_non_terminal * last_gae_lam
+            self.advantages[step] = last_gae_lam
+        # TD(lambda) estimator, see Github PR #375 or "Telescoping in TD(lambda)"
+        # in David Silver Lecture 4: https://www.youtube.com/watch?v=PnHCvfgC_ZA
+        self.returns = self.advantages + self.values
 
     def _get_samples(
         self,
@@ -101,14 +127,14 @@ class ReplayBuffer():
             if not isinstance(getattr(self, i)[0], torch.Tensor):
                 j = np.array(getattr(self, i))
             else:
-                j = torch.tensor(getattr(self, i), device=self.device)
+                j = torch.stack(tuple(getattr(self, i))).to(self.device)
             if len(j.shape) == 1:
                 if not isinstance(getattr(self, i)[0], torch.Tensor):
-                    data.append(np.array(getattr(self, i))[batch_inds])
+                    data.append(np.array(getattr(self, i))[batch_inds.tolist()])
                 else:
-                    data.append(j[batch_inds])
+                    data.append(j[batch_inds.tolist()])
             else:
-                data.append(np.array(getattr(self, i))[batch_inds, :])
+                data.append(j[batch_inds.tolist()])
         # data = [np.array(getattr(self, i))[:, batch_inds]for i in self.info]
         return tuple(map(self.to_torch, data))
         # return data
@@ -118,18 +144,18 @@ class ReplayBuffer():
             wt_label:Union[List[bool], bool] = None):
         while len(data) < len(self.info):
             data.append([None] * len(data[0]))
-        if isinstance(data[0], List) or isinstance(data[0], np.ndarray):
-            for i in range(len(self.info)):
-                setattr(self, self.info[i], data[i])
-            setattr(self, 'wt_label', wt_label)
-            self.buffer_size = len(getattr(self, self.info[i]))
-            assert self.buffer_size == len(wt_label)
-        else:
-            for i in range(len(self.info)):
-                j = getattr(self, self.info[i])
-                j.append(data[i])
-            self.buffer_size = len(j)
-            self.wt_label.append(wt_label)
+        # if isinstance(data[0], List) or isinstance(data[0], np.ndarray):
+        #     for i in range(len(self.info)):
+        #         setattr(self, self.info[i], data[i])
+        #     setattr(self, 'wt_label', wt_label)
+        #     self.buffer_size = len(getattr(self, self.info[i]))
+        #     assert self.buffer_size == len(wt_label)
+        # else:
+        for i in range(len(self.info)):
+            j = getattr(self, self.info[i])
+            j.append(data[i])
+        self.buffer_size = len(j)
+        self.wt_label.append(wt_label)
 
     def compute_returns(self, outlook_steps = 5, gamma = 0.99):
         R_list = [] # Return list
