@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+from typing import Type
+import torch as th
 
 @dataclass
 class Args:
@@ -22,17 +24,18 @@ class Args:
     # Algorithm specific arguments
     env_id: str = "EnergyGym-ppo-v1"
     """the id of the environment"""
-    total_timesteps: int = 1000
-    """total timesteps of the experiments"""
-    """the id of the environment"""
+    n_epochs: int = 1
+    """training time of per epoch"""
     input_dim: int = 5
     """the id of the environment"""
     output_dim: int = 5
     """the id of the environment"""         
-    learning_rate: float = 2.5e-2
-    """the learning rate of the optimizer"""
     buffer_size: int = 1000
     """the replay memory buffer size"""
+    # batch_size: int = 64
+    # """the minibatch size"""
+    optimizer_class: Type[th.optim.Optimizer] = th.optim.SGD
+    """the optimizer"""    
     minibatch_size: int = 64
     """the minibatch size"""    
     num_steps: int = 128
@@ -45,10 +48,10 @@ class Args:
     """the fraction of `total-timesteps` it takes from start-e to go end-e"""        
     anneal_lr: bool = True
     """Toggle learning rate annealing for policy and value networks"""
-    gamma: float = 0.99
-    """the discount factor gamma"""
-    gae_lambda: float = 0.95
-    """the lambda for the general advantage estimation"""
+    # gamma: float = 0.99
+    # """the discount factor gamma"""
+    # gae_lambda: float = 0.95
+    # """the lambda for the general advantage estimation"""
     num_minibatches: int = 4
     """the number of mini-batches"""
     update_epochs: int = 1
@@ -59,10 +62,10 @@ class Args:
     """the surrogate clipping coefficient"""
     clip_vloss: bool = False
     """Toggles whether or not to use a clipped loss for the value function, as per the paper."""
-    ent_coef: float = 0.1
-    """coefficient of the entropy"""
-    vf_coef: float = 1
-    """coefficient of the value function"""
+    # ent_coef: float = 0.1
+    # """coefficient of the entropy"""
+    # vf_coef: float = 1
+    # """coefficient of the value function"""
     max_grad_norm: float = 10
     """the maximum norm for the gradient clipping"""
     target_kl: float = None
@@ -81,3 +84,23 @@ class Args:
     """the batch size (computed in runtime)"""    
     train_frequency: int = 1
     """the batch size (computed in runtime)"""        
+
+    learning_rate: float = 0.01
+    alpha: float = 0.9
+    outlook_steps: int = 12
+    step_size: int = 2
+    batch_size: int = 12
+    n_steps: int = 2
+    gamma: float = 0.1
+    gae_lambda: float = 1
+    ent_coef: float = 0.1
+    vf_coef: float = 1
+    max_grad_norm: float = 50
+    use_sde: bool = False
+    sde_sample_freq: int = -1
+    # train_perEp: int = 1
+    pol_coef: float = 1
+    total_epoch: int = 1
+    max_train_perEp: int = 1
+    xa_init_gain: float = 1.
+    optimizer_class: Type[th.optim.Optimizer] = th.optim.RMSprop

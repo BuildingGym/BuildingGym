@@ -6,6 +6,8 @@ test
 *.csv
 *.xls
 *.pdf
+*.xls
+*.txt
 *.epw
 PlayGame_Test-v25-For-PV.py
 RL control ref/*

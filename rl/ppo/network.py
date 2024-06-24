@@ -251,7 +251,7 @@ class Agent(nn.Module):
             pi_features=vf_features = obs            
         latent_pi = self.mlp_extractor.policy_net(pi_features)
         distribution = self._get_action_dist_from_latent(latent_pi)
-        actions = distribution.sample()
+        # actions = distribution.sample()
         log_prob = distribution.log_prob(actions)
         entropy = distribution.entropy()
         latent_vf = self.mlp_extractor.value_net(vf_features)
