@@ -86,7 +86,7 @@ class A2C(OnPolicyAlgorithm):
         use_rms_prop: bool = True,
         use_sde: bool = False,
         sde_sample_freq: int = -1,
-        buffer_info: List[str] = ['observations', 'actions', 'rewards', 'logprobs'],
+        buffer_info: List[str] = ['observations', 'actions', 'rewards', 'logprobs', 'values'],
         rollout_buffer_class: Optional[Type[RolloutBuffer]] = None,
         rollout_buffer_kwargs: Optional[Dict[str, Any]] = None,
         normalize_advantage: bool = False,
@@ -146,11 +146,15 @@ class A2C(OnPolicyAlgorithm):
         if _init_setup_model:
             self._setup_model()
 
-    def train(self, obs, actions, returns) -> None:
+    def train(self, buffer) -> None:
         """
         Update policy using the currently gathered
         rollout buffer (one gradient step over whole data).
         """
+        train_input, R, adv = buffer.get(self.args.batch_size)
+        obs = train_input[0]
+        actions = train_input[1]
+        advantages = adv
         # Switch to train mode (this affects batch norm / dropout)
         self.policy.set_training_mode(True)
 
@@ -173,7 +177,6 @@ class A2C(OnPolicyAlgorithm):
         values = values.flatten()
 
         # Normalize advantage (not present in the original implementation)
-        advantages = returns
         if self.normalize_advantage:
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
@@ -181,7 +184,7 @@ class A2C(OnPolicyAlgorithm):
         policy_loss = -(advantages * log_prob).mean()
 
         # Value loss using the TD(gae_lambda) target
-        value_loss = F.mse_loss(returns.squeeze(), values)
+        value_loss = F.mse_loss(R.squeeze(), values)
 
         # Entropy loss favor exploration
         if entropy is None:

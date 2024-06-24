@@ -72,7 +72,7 @@ class buildinggym_env():
             #LogProvider(),
         )
         self.buffer = ReplayBuffer(
-            info=['obs', 'action', 'logprb', 'rewards', 'values'],
+            info=['obs', 'action', 'logprbs', 'rewards', 'values'],
             args=args
             )
         self.idf_file = idf_file
@@ -334,8 +334,7 @@ class buildinggym_env():
                         else:
                             self.batch_n=0
                             self.buffer.cal_R_adv()
-                            train_input, R, adv = self.buffer.get(self.args.batch_size)
-                            p_loss_i, v_loss_i = self.algo.train(train_input[0], train_input[1], adv)
+                            p_loss_i, v_loss_i = self.algo.train(self.buffer)
                             self.buffer.reset()  # dxl: can update to be able to store somme history info
                             self.p_loss_list.append(p_loss_i)
                             self.v_loss_list.append(v_loss_i)
