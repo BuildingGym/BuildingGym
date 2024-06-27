@@ -96,6 +96,22 @@ class ReplayBuffer():
                 idx.append(random.randint(0, self.buffer_size-1))
             return self._get_samples(np.array(idx)), torch.stack(tuple([self.returns[i] for i in idx])), torch.stack(tuple([self.advantages[i] for i in idx]))
         
+    def get_sample(self, batch_size = None, start_idx = None, shuffle = False):
+
+        if batch_size is None:
+            batch_size = self.buffer_size * self.n_envs
+        if not shuffle:
+            if start_idx is None:
+                start_idx = 0
+            assert start_idx<=self.buffer_size-batch_size
+            idx = np.arange(start_idx, start_idx + batch_size)
+            return self._get_samples(idx)
+        else:
+            idx = []
+            while len(idx)<batch_size:
+                idx.append(random.randint(0, self.buffer_size-1))
+            return self._get_samples(np.array(idx))    
+        
     def cal_R_adv(self):
         # Convert to numpy
         # last_values = last_values.clone().cpu().numpy().flatten()
@@ -128,11 +144,13 @@ class ReplayBuffer():
                 j = np.array(getattr(self, i))
             else:
                 j = torch.stack(tuple(getattr(self, i))).to(self.device)
+                while j.dim()>2:
+                    j.squeeze_(-1)
             if len(j.shape) == 1:
                 if not isinstance(getattr(self, i)[0], torch.Tensor):
-                    data.append(np.array(getattr(self, i))[batch_inds.tolist()])
+                    data.append(np.expand_dims(np.array(getattr(self, i))[batch_inds.tolist()], 1))
                 else:
-                    data.append(j[batch_inds.tolist()])
+                    data.append(j[batch_inds.tolist()].unsquare_(1))
             else:
                 data.append(j[batch_inds.tolist()])
         # data = [np.array(getattr(self, i))[:, batch_inds]for i in self.info]
@@ -207,17 +225,17 @@ class ReplayBuffer():
         """
         if isinstance(array, np.ndarray):
             if copy:
-                return th.tensor(array, device=self.device)
-            return th.as_tensor(array, device=self.device)       
+                return th.tensor(array, device=self.device, dtype=torch.float64)
+            return th.as_tensor(array, device=self.device, dtype=torch.float64)       
         elif isinstance(array, List):
             if not  isinstance(array[0], torch.Tensor):
                 if copy:
-                    return th.tensor(np.array(array), device=self.device)
-                return th.as_tensor(np.array(array), device=self.device)
+                    return th.tensor(np.array(array), device=self.device, dtype=torch.float64)
+                return th.as_tensor(np.array(array), device=self.device, dtype=torch.float64)
             else:
                 torch.tensor(array)
         elif isinstance(array, torch.Tensor):
-           return array
+           return array.double()
 
 # if __name__ == '__main__':
 #     a = ReplayBuffer(['observation', 'actions'])
