@@ -85,7 +85,7 @@ class Args:
     # """the batch size (computed in runtime)"""        
 
     device: str = 'cuda'
-    learning_rate: float = 0.001
+    learning_rate: float = 0.01
     alpha: float = 0.9
     outlook_steps: int = 12
     step_size: int = 2
@@ -93,10 +93,10 @@ class Args:
     # n_steps: int = 2
     # n_epochs: int = 10
     # clip_range: int = 50
-    gradient_steps: int = 30
+    gradient_steps: int = 300
     # clip_range_vf: Union[float, None] = None
-    normalize_advantage: bool = True
-    tau: float = 0.005
+    # normalize_advantage: bool = True
+    tau: float = 1
     target_policy_noise: float = 0.2
     target_noise_clip: float = 0.5
     policy_delay: int = 2
