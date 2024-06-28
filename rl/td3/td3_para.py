@@ -24,7 +24,7 @@ class Args:
     # Algorithm specific arguments
     env_id: str = "EnergyGym-td3-v1"
     """the id of the environment"""
-    total_timesteps: int = 1000
+    # total_timesteps: int = 1000
     """total timesteps of the experiments"""
     """the id of the environment"""
     # input_dim: int = 5
@@ -79,27 +79,31 @@ class Args:
     # """the number of steps to outlook for accumulate rewards"""    
     # batch_size: int = 64
     # """the batch size (computed in runtime)"""
-    learning_starts: int = 1
+    learning_starts: int = 0
     """the batch size (computed in runtime)"""    
     # train_frequency: int = 1
     # """the batch size (computed in runtime)"""        
 
     device: str = 'cuda'
-    learning_rate: float = 0.01
+    learning_rate: float = 0.005
     alpha: float = 0.9
-    outlook_steps: int = 12
+    outlook_steps: int = 6
     step_size: int = 2
-    batch_size: int = 32
+    batch_size: int = 8
     # n_steps: int = 2
     # n_epochs: int = 10
     # clip_range: int = 50
-    gradient_steps: int = 300
+    gradient_steps: int = 1
+    epsilon_start: float = 0.5
+    epsilon_end: float = 0.05
+    epsilon_decay: float = 0.9
     # clip_range_vf: Union[float, None] = None
     # normalize_advantage: bool = True
-    tau: float = 1
-    target_policy_noise: float = 0.2
+    tau: float = .8
+    target_policy_noise: float = 0.1
+    noise_std: float = 0.1
     target_noise_clip: float = 0.5
-    policy_delay: int = 2
+    policy_delay: int = 10
     gamma: float = 0.9
     # gae_lambda: float = 1
     # ent_coef: float = 0

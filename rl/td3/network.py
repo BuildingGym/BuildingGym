@@ -16,6 +16,7 @@ from stable_baselines3.common.torch_layers import (
     get_actor_critic_arch,
 )
 from stable_baselines3.common.type_aliases import PyTorchObs, Schedule
+from rl.td3.td3_para import Args
 
 
 class Actor(nn.Module):
@@ -41,6 +42,7 @@ class Actor(nn.Module):
         # features_dim: int,
         features_extractor: List[int] =None,
         activation_fn: Type[nn.Module] = nn.ReLU,
+        args: Args = None,
     ):
         super(Actor, self).__init__()
         # super().__init__(
@@ -50,7 +52,7 @@ class Actor(nn.Module):
         #     normalize_images=normalize_images,
         #     squash_output=True,
         # )
-
+        self.args = args
         self.net_arch = net_arch
         if features_extractor == None:
             self.features_dim = last_layer_dim = observation_space.shape[0]
@@ -84,14 +86,21 @@ class Actor(nn.Module):
         )
         return data
 
-    def forward(self, obs: th.Tensor) -> th.Tensor:
+    def forward(self, obs: th.Tensor, deterministic: bool = False) -> th.Tensor:
         # assert deterministic, 'The TD3 actor only outputs deterministic actions'
         # features = self.extract_features(obs, self.features_extractor)
         if self.fe_net is not None:
             feature = self.fe_net(obs.to(th.float32))
         else:
             feature = obs.to(th.float32)
-        return self.mu(feature)
+        action = self.mu(feature)
+        dis = th.distributions.Normal(action, self.args.noise_std)
+        if deterministic:
+            return action
+        else:
+            action += dis.sample()
+            action = action.clamp(-1,1)
+            return action
 
     # def _predict(self, observation: PyTorchObs, deterministic: bool = False) -> th.Tensor:
     #     # Note: the deterministic deterministic parameter is ignored in the case of TD3.
@@ -140,6 +149,7 @@ class ContinuousCritic(nn.Module):
         activation_fn: Type[nn.Module] = nn.ReLU,
         n_critics: int = 2,
         share_features_extractor: bool = True,
+        args: Args = None,
     ):
         super(ContinuousCritic, self).__init__()
         # super().__init__(
@@ -201,12 +211,11 @@ class ContinuousCritic(nn.Module):
             with th.no_grad():
                 feature = self.fe_net(obs.to(th.float32))
         else:
-            feature = obs
-        return self.q_networks[0](th.cat([feature, actions], dim=1))
+            feature = obs.to(th.float32)
+        return self.q_networks[0](th.cat([feature, actions.to(th.float32)], dim=1))
     
     def set_training_mode(self, mode):
         self.train(mode)    
-    
 
 
 class Agent(nn.Module):
@@ -280,7 +289,8 @@ class Agent(nn.Module):
             "action_space": action_space,
             "net_arch": actor_arch,
             "activation_fn": self.activation_fn,
-            "features_extractor": [128]
+            "features_extractor": None,
+            "args": self.args,
         }
         self.actor_kwargs = self.net_args.copy()
         self.critic_kwargs = self.net_args.copy()
@@ -300,6 +310,7 @@ class Agent(nn.Module):
         # Create actor and target
         # the features extractor should not be shared
         self.actor = Actor(**self.actor_kwargs)
+        self.init_weight(self.actor)
         self.actor_target = Actor(**self.actor_kwargs)
         # Initialize the target to have the same weights as the actor
         self.actor_target.load_state_dict(self.actor.state_dict())
@@ -328,7 +339,7 @@ class Agent(nn.Module):
             # Create new features extractor for each network
             self.critic = ContinuousCritic(**self.critic_kwargs)
             self.critic_target = ContinuousCritic(**self.critic_kwargs)
-
+        self.init_weight(self.critic)
         self.critic_target.load_state_dict(self.critic.state_dict())
         self.critic.optimizer = self.args.optimizer_class(
             self.critic.parameters(),
@@ -368,7 +379,7 @@ class Agent(nn.Module):
         #   Predictions are always deterministic.
         if observation.dim() == 1:
             observation = observation.unsqueeze(0)
-        return self.actor(observation)
+        return self.actor(observation, deterministic)
 
     def set_training_mode(self, mode: bool) -> None:
         """
@@ -381,3 +392,12 @@ class Agent(nn.Module):
         self.actor.set_training_mode(mode)
         self.critic.set_training_mode(mode)
         self.training = mode
+
+    def init_weight(self, network):
+        for m in network.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.normal(m.weight, mean=0, std = 0.1)
+                # nn.init.xavier_normal_(m.weight, gain=1)
+                # nn.init.orthogonal_(m.weight, gain=1)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)            

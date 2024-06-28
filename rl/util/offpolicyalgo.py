@@ -142,6 +142,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         self.gamma = args.gamma
         self.gradient_steps = args.gradient_steps
         self.action_noise = action_noise
+        self.epsilon = args.epsilon_start
         # self.optimize_memory_usage = optimize_memory_usage
         # self.replay_buffer: Optional[ReplayBuffer] = None
         # self.replay_buffer_class = replay_buffer_class
@@ -562,7 +563,8 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             self.actor.reset_noise(env.num_envs)
 
         callback.on_rollout_start()
-        env.run()
+        env.run(epsilon=self.epsilon)
+        self._update_epsilon()
         self._update_learning_rate(self.policy.actor.optimizer, self.args.alpha)          
         self._update_learning_rate(self.policy.critic.optimizer, self.args.alpha)        
         # continue_training = True
@@ -624,3 +626,6 @@ class OffPolicyAlgorithm(BaseAlgorithm):
 
         # return RolloutReturn(num_collected_steps * env.num_envs, num_collected_episodes, continue_training)
         return self, performance
+
+    def _update_epsilon(self):
+        self.epsilon = max(self.args.epsilon_end, self.epsilon * self.args.epsilon_decay)

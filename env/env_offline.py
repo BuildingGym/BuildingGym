@@ -129,7 +129,8 @@ class buildinggym_env():
         self.agent = self.algo.policy
         self.ready_to_train = True
         
-    def run(self, agent = None):
+    def run(self, agent = None, epsilon: float = 0):
+        self.epsilon = epsilon
         self.sensor_index = 0
         # if agent is not None:
         #     self.agent = agent
@@ -290,7 +291,10 @@ class buildinggym_env():
             with torch.no_grad():
                 actions = self.agent(state)
                 # actions = torch.argmax(q_values, dim=0).cpu().item()
-            self.com +=  actions.cpu().item() - 0.5
+            if random.random() < self.epsilon:
+                actions = torch.FloatTensor(actions.shape).uniform_(-1, 1).to(device=self.args.device, dtype=actions.dtype)
+                # actions = torch.rand(actions.shape, device=self.args.device, dtype = actions.dtype)
+            self.com +=  actions.cpu().item() * 0.5
             self.com = max(min(self.com, 27), 23)
             # self.com = 26
             obs = pd.DataFrame(obs, index = [self.sensor_index])                

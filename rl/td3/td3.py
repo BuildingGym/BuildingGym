@@ -247,7 +247,8 @@ class TD3(OffPolicyAlgorithm):
             # Delayed policy updates
             if self._n_updates % self.policy_delay == 0:
                 # Compute actor loss
-                actor_loss = -self.policy.critic.q1_forward(obs, self.policy.actor(obs)).mean()
+                # actor_loss = -self.policy.critic.q1_forward(obs, self.policy.actor(obs)).mean()
+                actor_loss = -self.policy.critic.q1_forward(obs, actions).mean()
                 actor_losses.append(actor_loss.item())
 
                 # Optimize the actor
