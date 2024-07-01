@@ -79,7 +79,7 @@ class buildinggym_env():
                  action_space,
                  observation_dim,
                  action_type,
-                 args,
+                 args=None,
                  agent = None) -> None:
         global thinenv
         self.simulator = Simulator().add(
@@ -111,7 +111,7 @@ class buildinggym_env():
         self.num_envs = 1
         self.agent = agent
         self.ready_to_train = False
-        self.args = tyro.cli(args)
+        self.args = args
         self.p_loss_list = []
         self.v_loss_list = []
         self.success_n = 0
@@ -121,7 +121,7 @@ class buildinggym_env():
         self.return_batch = torch.zeros(args.batch_size, 1).to('cuda')
         self.simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
         self.baseline = pd.read_csv('Data\\Day_mean.csv')
-        self.com = 25
+        self.com = 26
         # self.baseline['Time'] = pd.to_datetime(self.baseline['Time'], format='%m/%d/%Y %H:%M')
 
     def setup(self, algo):
@@ -156,13 +156,13 @@ class buildinggym_env():
 
     def normalize_input_i(self, state):
         nor_min = np.array([22.8, 22, 0, 0, 0])
-        nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89])
-        std = np.array([2.17, 0.5, 0.39, 0.26, 0.26])
+        nor_mean = np.array([29.3, 27, 0.78, 0.58, 0.89])
+        std = np.array([2, 0.5, 0.39, 0.26, 0.26])
         # nor_min = np.array([0, 0, 0, 0, 0])
         nor_max = np.array([33.3, 27, 1, 1, 1])
         # nor_max = np.array([1, 1, 1, 1, 1])
         return (state- nor_mean)/std
-        return (state- nor_min)/(nor_max - nor_min)
+        # return (state- nor_min)/(nor_max - nor_min)
         # return (state - np.array([27, 25, 0.5, 0.5, 0.5]))/np.array([3, 1, 0.2, 0.2, 0.2])
     
     def label_working_time(self):
@@ -292,11 +292,12 @@ class buildinggym_env():
                 actions = self.agent(state)
                 # actions = torch.argmax(q_values, dim=0).cpu().item()
             if random.random() < self.epsilon:
+            # if random.random() < 1.1:
                 actions = torch.FloatTensor(actions.shape).uniform_(-1, 1).to(device=self.args.device, dtype=actions.dtype)
                 # actions = torch.rand(actions.shape, device=self.args.device, dtype = actions.dtype)
             self.com +=  actions.cpu().item() * 0.5
             self.com = max(min(self.com, 27), 23)
-            # self.com = 26
+            # self.com = 27
             obs = pd.DataFrame(obs, index = [self.sensor_index])                
             obs.insert(0, 'Time', t)
             obs.insert(0, 'day_of_week', t.weekday())

@@ -6,7 +6,7 @@ import torch as th
 class Args:
     exp_name: str = 'buildinggym-td3'
     """the name of this experiment"""
-    seed: int = 1
+    seed: int = 28
     """seed of the experiment"""
     # torch_deterministic: bool = True
     # """if toggled, `torch.backends.cudnn.deterministic=False`"""
@@ -81,29 +81,29 @@ class Args:
     # """the batch size (computed in runtime)"""
     learning_starts: int = 0
     """the batch size (computed in runtime)"""    
-    # train_frequency: int = 1
-    # """the batch size (computed in runtime)"""        
+    train_frequency: int = 1
+    """the batch size (computed in runtime)"""        
 
     device: str = 'cuda'
-    learning_rate: float = 0.005
-    alpha: float = 0.9
+    learning_rate: float = 0.0001
+    alpha: float = 0.999
     outlook_steps: int = 6
     step_size: int = 2
     batch_size: int = 8
     # n_steps: int = 2
     # n_epochs: int = 10
     # clip_range: int = 50
-    gradient_steps: int = 1
+    gradient_steps: int = 30
     epsilon_start: float = 0.5
     epsilon_end: float = 0.05
     epsilon_decay: float = 0.9
     # clip_range_vf: Union[float, None] = None
     # normalize_advantage: bool = True
-    tau: float = .8
-    target_policy_noise: float = 0.1
-    noise_std: float = 0.1
-    target_noise_clip: float = 0.5
-    policy_delay: int = 10
+    tau: float = 1
+    target_policy_noise: float = 0.01
+    noise_std: float = 0.01
+    target_noise_clip: float = 0.2
+    policy_delay: int = 30
     gamma: float = 0.9
     # gae_lambda: float = 1
     # ent_coef: float = 0
@@ -113,7 +113,7 @@ class Args:
     sde_sample_freq: int = -1
     # train_perEp: int = 1
     # pol_coef: float = 1
-    total_epoch: int = 100
+    total_epoch: int = max(int(100/gradient_steps),1000)
     # max_train_perEp: int = 1
     # xa_init_gain: float = 1.
     optimizer_class: Type[th.optim.Optimizer] = th.optim.SGD

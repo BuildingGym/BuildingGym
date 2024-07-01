@@ -40,8 +40,8 @@ class Actor(nn.Module):
         action_space: spaces.Box,
         net_arch: List[int],
         # features_dim: int,
+        activation_fn: Type[nn.Module],
         features_extractor: List[int] =None,
-        activation_fn: Type[nn.Module] = nn.ReLU,
         args: Args = None,
     ):
         super(Actor, self).__init__()
@@ -69,9 +69,18 @@ class Actor(nn.Module):
         self.activation_fn = activation_fn
         self.features_extractor = features_extractor
         # action_dim = action_space.n
+        # actor_net = []
+        # last_layer_dim_pi = self.features_dim
+        # for curr_layer_dim in net_arch:
+        #     actor_net.append(nn.Linear(last_layer_dim_pi, curr_layer_dim))
+        #     actor_net.append(activation_fn())
+        #     last_layer_dim_pi = curr_layer_dim     
+        # actor_net.append(nn.Linear(last_layer_dim_pi, 1))
+        # actor_net.append(nn.Tanh())
         actor_net = create_mlp(self.features_dim, 1, net_arch, activation_fn, squash_output=True)
         # Deterministic action
         self.mu = nn.Sequential(*actor_net)
+        a = 1
 
     def _get_constructor_parameters(self) -> Dict[str, Any]:
         data = super()._get_constructor_parameters()
@@ -252,7 +261,7 @@ class Agent(nn.Module):
         action_space: spaces.Box,
         lr_schedule: Schedule,
         net_arch: Optional[Union[List[int], Dict[str, List[int]]]] = None,
-        activation_fn: Type[nn.Module] = nn.ReLU,
+        activation_fn: Type[nn.Module] = nn.Sigmoid,
         features_extractor_class: Type[BaseFeaturesExtractor] = FlattenExtractor,
         features_extractor_kwargs: Optional[Dict[str, Any]] = None,
         normalize_images: bool = True,
@@ -289,7 +298,7 @@ class Agent(nn.Module):
             "action_space": action_space,
             "net_arch": actor_arch,
             "activation_fn": self.activation_fn,
-            "features_extractor": None,
+            "features_extractor": [5],
             "args": self.args,
         }
         self.actor_kwargs = self.net_args.copy()
@@ -305,6 +314,7 @@ class Agent(nn.Module):
         self.share_features_extractor = share_features_extractor
 
         self._build(lr_schedule)
+        a = 1
 
     def _build(self, lr_schedule: Schedule) -> None:
         # Create actor and target
@@ -396,8 +406,8 @@ class Agent(nn.Module):
     def init_weight(self, network):
         for m in network.modules():
             if isinstance(m, nn.Linear):
-                nn.init.normal(m.weight, mean=0, std = 0.1)
-                # nn.init.xavier_normal_(m.weight, gain=1)
+                # nn.init.normal(m.weight, mean=0, std = 0.5)
+                nn.init.xavier_normal_(m.weight, gain=1)
                 # nn.init.orthogonal_(m.weight, gain=1)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)            

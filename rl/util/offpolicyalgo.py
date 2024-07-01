@@ -581,7 +581,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
 
         self.num_timesteps += env.num_envs
         performance = np.mean(env.sensor_dic['rewards'][np.where(env.sensor_dic['Working time'])[0]])
-        if performance > 0.3:
+        if performance > 0.5:
             path_i = os.path.join('Archive results', self.run_name)
             if not os.path.exists(path_i):
                 os.mkdir(path_i) 
