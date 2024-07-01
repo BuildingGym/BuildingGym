@@ -241,14 +241,16 @@ class TD3(OffPolicyAlgorithm):
             self.policy.critic.optimizer.zero_grad()
             critic_loss.backward()
             self.policy.critic.optimizer.step()
-            # for name, param in self.policy.critic_target.named_parameters():
+            # for name, param in self.policy.actor.named_parameters():
             #     if param.requires_grad:
             #         print(f"{name}: {param.grad}")       
             # Delayed policy updates
             if self._n_updates % self.policy_delay == 0:
                 # Compute actor loss
                 # actor_loss = -self.policy.critic.q1_forward(obs, self.policy.actor(obs)).mean()
-                actor_loss = -self.policy.critic.q1_forward(obs, actions).mean()
+                # obs.requires_grad = True
+                # actions.requires_grad = True
+                actor_loss = -self.policy.critic.q1_forward(obs, self.policy.actor(obs, deterministic = True)).mean()
                 actor_losses.append(actor_loss.item())
 
                 # Optimize the actor

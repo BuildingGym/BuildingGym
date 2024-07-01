@@ -349,7 +349,7 @@ class buildinggym_env():
                         action_i = self.actions[i]
                         R_i = self.cal_return(self.rewards[i+1:i+b])
                         # if self.batch_n<self.args.batch_size:
-                        self.buffer.add([ob_i, action_i, r_i, ob_nxt_i])   # List['obs', 'actions', 'rewards', 'nxt_obs']
+                        self.buffer.add([ob_i, action_i, r_i, ob_nxt_i], max_buffer_size = self.args.max_buffer_size)  # List['obs', 'actions', 'rewards', 'nxt_obs']
                             # self.obs_batch[self.batch_n, :] = ob_i
                             # self.return_batch[self.batch_n, :] = R_i
                             # self.action_batch[self.batch_n, :] = action_i
@@ -361,5 +361,9 @@ class buildinggym_env():
                         #     self.buffer.reset()  # dxl: can update to be able to store somme history info
                         #     self.p_loss_list.append(p_loss_i)
                         #     self.v_loss_list.append(v_loss_i)
-                            
+                if i % self.args.train_frequency == 0 and self.buffer.buffer_size>self.args.batch_size:
+                    self.actor_losses_i, self.critic_losses_i = self.algo.train()
+                    self.p_loss_list.append(self.actor_losses_i)
+                    self.v_loss_list.append(self.critic_losses_i)                    
+
             self.sensor_index+=1

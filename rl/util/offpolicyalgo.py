@@ -338,7 +338,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
 
         assert self.env is not None, "You must set the environment before calling learn()"
         # assert isinstance(self.train_freq, TrainFreq)  # check done in _setup_learn()
-        self.env.buffer.reset()
+        # self.env.buffer.reset()
         while self.num_timesteps < total_timesteps:
             _, performance = self.collect_rollouts(
                 self.env,
@@ -353,14 +353,14 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             # if not rollout.continue_training:
             #     break
 
-            if self.num_timesteps > 0 and self.num_timesteps > self.learning_starts:
+            # if self.num_timesteps > 0 and self.num_timesteps > self.learning_starts:
                 # If no `gradient_steps` is specified,
                 # do as many gradients steps as steps performed during the rollout
                 # gradient_steps = self.gradient_steps if self.gradient_steps >= 0 else rollout.episode_timesteps
                 # Special case when the user passes `gradient_steps=0`
-                if self.gradient_steps > 0:
-                    self.actor_losses_i, self.critic_losses_i = self.train()
-                    callback.on_epoch_end()
+                # if self.gradient_steps > 0:
+                    # self.actor_losses_i, self.critic_losses_i = self.train()
+                    # callback.on_epoch_end()
 
         callback.on_training_end()
 

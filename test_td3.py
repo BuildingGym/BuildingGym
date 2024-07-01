@@ -120,7 +120,7 @@ action_space = _gymnasium_.spaces.Dict({
                         key='Always 26',
                     ))
                 })
-schedule = ConstantSchedule(0.0001)
+# schedule = ConstantSchedule(0.0001)
 input_sp = Box(np.array([0] * 5), np.array([1] * 5))
 # action_sp = Box(np.array([0, -0.5]), np.array([1, 0.5]))
 action_sp = Discrete(3)

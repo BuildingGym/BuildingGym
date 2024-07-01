@@ -81,20 +81,20 @@ class Args:
     # """the batch size (computed in runtime)"""
     learning_starts: int = 0
     """the batch size (computed in runtime)"""    
-    train_frequency: int = 1
+    train_frequency: int = 2
     """the batch size (computed in runtime)"""        
 
     device: str = 'cuda'
-    learning_rate: float = 0.0001
-    alpha: float = 0.999
+    learning_rate: float = 0.01
+    alpha: float = 0.9
     outlook_steps: int = 6
-    step_size: int = 2
-    batch_size: int = 8
+    step_size: int = 1
+    batch_size: int = 64
     # n_steps: int = 2
     # n_epochs: int = 10
     # clip_range: int = 50
-    gradient_steps: int = 30
-    epsilon_start: float = 0.5
+    gradient_steps: int = 2
+    epsilon_start: float = 0.3
     epsilon_end: float = 0.05
     epsilon_decay: float = 0.9
     # clip_range_vf: Union[float, None] = None
@@ -103,8 +103,9 @@ class Args:
     target_policy_noise: float = 0.01
     noise_std: float = 0.01
     target_noise_clip: float = 0.2
-    policy_delay: int = 30
+    policy_delay: int = 20
     gamma: float = 0.9
+    max_buffer_size: int = 500
     # gae_lambda: float = 1
     # ent_coef: float = 0
     # vf_coef: float = 0.5

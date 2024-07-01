@@ -159,9 +159,14 @@ class ReplayBuffer():
 
     def add(self, 
             data: List[Union[List, float, torch.Tensor]],
-            wt_label:Union[List[bool], bool] = None):
+            wt_label:Union[List[bool], bool] = None,
+            max_buffer_size: int = np.inf):
         while len(data) < len(self.info):
             data.append([None] * len(data[0]))
+        if self.buffer_size>=max_buffer_size:
+            for i in range(len(self.info)):
+                j = getattr(self, self.info[i])
+                j.pop(0)
         # if isinstance(data[0], List) or isinstance(data[0], np.ndarray):
         #     for i in range(len(self.info)):
         #         setattr(self, self.info[i], data[i])
