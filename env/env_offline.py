@@ -9,6 +9,7 @@ from energyplus import ooep
 import torch.nn.functional as F
 import os
 import wandb
+import math
 import tyro
 from torch.utils.tensorboard import SummaryWriter
 import torch.optim as optim
@@ -129,8 +130,9 @@ class buildinggym_env():
         self.agent = self.algo.policy
         self.ready_to_train = True
         
-    def run(self, agent = None, epsilon: float = 0):
+    def run(self, agent = None, epsilon: float = 0, train: bool = True):
         self.epsilon = epsilon
+        self.train = train
         self.sensor_index = 0
         # if agent is not None:
         #     self.agent = agent
@@ -332,8 +334,8 @@ class buildinggym_env():
                 self.rewards.append(reward_i)
             actions = actions.cpu().item()
             # com = 25. + actions * 2
-            act = thinenv.act({'Thermostat': self.com})
-            # act = thinenv.act({'Thermostat': 26})
+            # act = thinenv.act({'Thermostat': self.com})
+            act = thinenv.act({'Thermostat': 26.2})
 
             b  = self.args.outlook_steps + 1
             # self.buffer.add([self.states[i], self.actions[i], self.logprobs[i], r_i, value])   # List['obs', 'action', 'logprb', 'rewards', 'values']
@@ -361,9 +363,10 @@ class buildinggym_env():
                         #     self.buffer.reset()  # dxl: can update to be able to store somme history info
                         #     self.p_loss_list.append(p_loss_i)
                         #     self.v_loss_list.append(v_loss_i)
-                if i % self.args.train_frequency == 0 and self.buffer.buffer_size>self.args.batch_size:
+                if i % self.args.train_frequency == 0 and self.buffer.buffer_size>self.args.batch_size and self.train:
                     self.actor_losses_i, self.critic_losses_i = self.algo.train()
-                    self.p_loss_list.append(self.actor_losses_i)
+                    if not math.isnan(self.actor_losses_i):
+                        self.p_loss_list.append(self.actor_losses_i)
                     self.v_loss_list.append(self.critic_losses_i)                    
 
             self.sensor_index+=1

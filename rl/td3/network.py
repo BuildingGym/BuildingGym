@@ -298,7 +298,7 @@ class Agent(nn.Module):
             "action_space": action_space,
             "net_arch": actor_arch,
             "activation_fn": self.activation_fn,
-            "features_extractor": [5],
+            "features_extractor": [3],
             "args": self.args,
         }
         self.actor_kwargs = self.net_args.copy()
@@ -353,7 +353,7 @@ class Agent(nn.Module):
         self.critic_target.load_state_dict(self.critic.state_dict())
         self.critic.optimizer = self.args.optimizer_class(
             self.critic.parameters(),
-            lr=lr_schedule(1),  # type: ignore[call-arg]
+            lr=lr_schedule(1)*0.1,  # type: ignore[call-arg]
             **self.optimizer_kwargs,
         )
 
@@ -406,8 +406,8 @@ class Agent(nn.Module):
     def init_weight(self, network):
         for m in network.modules():
             if isinstance(m, nn.Linear):
-                # nn.init.normal(m.weight, mean=0, std = 0.5)
-                nn.init.xavier_normal_(m.weight, gain=1)
+                nn.init.normal(m.weight, mean=0, std = 0.1)
+                # nn.init.xavier_normal_(m.weight, gain=1)
                 # nn.init.orthogonal_(m.weight, gain=1)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)            

@@ -340,6 +340,10 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         # assert isinstance(self.train_freq, TrainFreq)  # check done in _setup_learn()
         # self.env.buffer.reset()
         while self.num_timesteps < total_timesteps:
+            if self.num_timesteps > self.learning_starts:
+                train = True
+            else:
+                train = False
             _, performance = self.collect_rollouts(
                 self.env,
                 # train_freq=self.train_freq,
@@ -348,6 +352,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
                 learning_starts=self.learning_starts,
                 # replay_buffer=self.replay_buffer,
                 log_interval=log_interval,
+                train = train,
             )
 
             # if not rollout.continue_training:
@@ -528,6 +533,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         action_noise: Optional[ActionNoise] = None,
         learning_starts: int = 0,
         log_interval: Optional[int] = None,
+        train: bool = False,
     ) -> RolloutReturn:
         """
         Collect experiences and store them into a ``ReplayBuffer``.
@@ -563,7 +569,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             self.actor.reset_noise(env.num_envs)
 
         callback.on_rollout_start()
-        env.run(epsilon=self.epsilon)
+        env.run(epsilon=self.epsilon, train = train)
         self._update_epsilon()
         self._update_learning_rate(self.policy.actor.optimizer, self.args.alpha)          
         self._update_learning_rate(self.policy.critic.optimizer, self.args.alpha)        
