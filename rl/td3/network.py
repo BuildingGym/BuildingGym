@@ -267,8 +267,8 @@ class Agent(nn.Module):
         normalize_images: bool = True,
         optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam,
         optimizer_kwargs: Optional[Dict[str, Any]] = {},
-        n_critics: int = 2,
-        share_features_extractor: bool = False,
+        n_critics: int = 1,
+        share_features_extractor: bool = True,
         args = None,
     ):
         super().__init__()
