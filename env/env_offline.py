@@ -297,7 +297,7 @@ class buildinggym_env():
             # if random.random() < 1.1:
                 actions = torch.FloatTensor(actions.shape).uniform_(-1, 1).to(device=self.args.device, dtype=actions.dtype)
                 # actions = torch.rand(actions.shape, device=self.args.device, dtype = actions.dtype)
-            self.com +=  actions.cpu().item() * 0.5
+            self.com = 24 +  actions.cpu().item() * 3
             self.com = max(min(self.com, 27), 23)
             # self.com = 27
             obs = pd.DataFrame(obs, index = [self.sensor_index])                
@@ -334,8 +334,8 @@ class buildinggym_env():
                 self.rewards.append(reward_i)
             actions = actions.cpu().item()
             # com = 25. + actions * 2
-            # act = thinenv.act({'Thermostat': self.com})
-            act = thinenv.act({'Thermostat': 26.2})
+            act = thinenv.act({'Thermostat': self.com})
+            # act = thinenv.act({'Thermostat': 26.2})
 
             b  = self.args.outlook_steps + 1
             # self.buffer.add([self.states[i], self.actions[i], self.logprobs[i], r_i, value])   # List['obs', 'action', 'logprb', 'rewards', 'values']

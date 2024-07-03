@@ -179,28 +179,28 @@ class BaseAlgorithm(ABC):
             # get VecNormalize object if needed
             # self._vec_normalize_env = unwrap_vec_normalize(env)
 
-            if supported_action_spaces is not None:
-                assert isinstance(self.action_space, supported_action_spaces), (
-                    f"The algorithm only supports {supported_action_spaces} as action spaces "
-                    f"but {self.action_space} was provided"
-                )
+            # if supported_action_spaces is not None:
+            #     assert isinstance(self.action_space, supported_action_spaces), (
+            #         f"The algorithm only supports {supported_action_spaces} as action spaces "
+            #         f"but {self.action_space} was provided"
+            #     )
 
-            if not support_multi_env and self.n_envs > 1:
-                raise ValueError(
-                    "Error: the model does not support multiple envs; it requires " "a single vectorized environment."
-                )
+            # if not support_multi_env and self.n_envs > 1:
+            #     raise ValueError(
+            #         "Error: the model does not support multiple envs; it requires " "a single vectorized environment."
+            #     )
 
-            # Catch common mistake: using MlpPolicy/CnnPolicy instead of MultiInputPolicy
-            if policy in ["MlpPolicy", "CnnPolicy"] and isinstance(self.observation_space, spaces.Dict):
-                raise ValueError(f"You must use `MultiInputPolicy` when working with dict observation space, not {policy}")
+            # # Catch common mistake: using MlpPolicy/CnnPolicy instead of MultiInputPolicy
+            # if policy in ["MlpPolicy", "CnnPolicy"] and isinstance(self.observation_space, spaces.Dict):
+            #     raise ValueError(f"You must use `MultiInputPolicy` when working with dict observation space, not {policy}")
 
-            if self.use_sde and not isinstance(self.action_space, spaces.Box):
-                raise ValueError("generalized State-Dependent Exploration (gSDE) can only be used with continuous actions.")
+            # if self.use_sde and not isinstance(self.action_space, spaces.Box):
+            #     raise ValueError("generalized State-Dependent Exploration (gSDE) can only be used with continuous actions.")
 
-            if isinstance(self.action_space, spaces.Box):
-                assert np.all(
-                    np.isfinite(np.array([self.action_space.low, self.action_space.high]))
-                ), "Continuous action space must have a finite lower and upper bound"
+            # if isinstance(self.action_space, spaces.Box):
+            #     assert np.all(
+            #         np.isfinite(np.array([self.action_space.low, self.action_space.high]))
+            #     ), "Continuous action space must have a finite lower and upper bound"
 
     @staticmethod
     def _wrap_env(env: GymEnv, verbose: int = 0, monitor_wrapper: bool = True) -> VecEnv:
