@@ -363,10 +363,12 @@ class buildinggym_env():
                         #     self.buffer.reset()  # dxl: can update to be able to store somme history info
                         #     self.p_loss_list.append(p_loss_i)
                         #     self.v_loss_list.append(v_loss_i)
-                if i % self.args.train_frequency == 0 and self.buffer.buffer_size>self.args.batch_size and self.train:
-                    self.actor_losses_i, self.critic_losses_i = self.algo.train()
-                    if not math.isnan(self.actor_losses_i):
-                        self.p_loss_list.append(self.actor_losses_i)
-                    self.v_loss_list.append(self.critic_losses_i)                    
+
+
+                # if i % self.args.train_frequency == 0 and self.buffer.buffer_size>self.args.batch_size and self.train:
+                #     self.actor_losses_i, self.critic_losses_i = self.algo.train()
+                #     if not math.isnan(self.actor_losses_i):
+                #         self.p_loss_list.append(self.actor_losses_i)
+                #     self.v_loss_list.append(self.critic_losses_i)                    
 
             self.sensor_index+=1

@@ -287,7 +287,7 @@ class Agent(nn.Module):
         self.args = args
         self.optimizer_kwargs = optimizer_kwargs
         if net_arch is None:
-            net_arch = [128, 32]
+            net_arch = [32, 8]
 
         actor_arch, critic_arch = get_actor_critic_arch(net_arch)
 
@@ -298,7 +298,7 @@ class Agent(nn.Module):
             "action_space": action_space,
             "net_arch": actor_arch,
             "activation_fn": self.activation_fn,
-            "features_extractor": [64],
+            "features_extractor": [16],
             "args": self.args,
         }
         self.actor_kwargs = self.net_args.copy()

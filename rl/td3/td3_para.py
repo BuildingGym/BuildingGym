@@ -81,15 +81,15 @@ class Args:
     # """the batch size (computed in runtime)"""
     learning_starts: int = -1
     """the batch size (computed in runtime)"""    
-    train_frequency: int = 100
+    train_frequency: int = 2000
     """the batch size (computed in runtime)"""        
 
     device: str = 'cuda'
-    learning_rate: float = 0.0005
-    alpha: float = 0.999
+    learning_rate: float = 0.01
+    alpha: float = 0.99
     outlook_steps: int = 6
     step_size: int = 1
-    batch_size: int = 32
+    batch_size: int = 256
     # n_steps: int = 2
     # n_epochs: int = 10
     # clip_range: int = 50
@@ -99,13 +99,13 @@ class Args:
     epsilon_decay: float = 0.98
     # clip_range_vf: Union[float, None] = None
     # normalize_advantage: bool = True
-    tau: float = 0.5
+    tau: float = 1
     target_policy_noise: float = 0.2
     noise_std: float = 0.2
     target_noise_clip: float = 5
-    policy_delay: int = 30
+    policy_delay: int = 2
     gamma: float = 0.9
-    max_buffer_size: int = 5000
+    max_buffer_size: int = 2000
     # gae_lambda: float = 1
     # ent_coef: float = 0
     # vf_coef: float = 0.5
@@ -114,7 +114,7 @@ class Args:
     sde_sample_freq: int = -1
     # train_perEp: int = 1
     # pol_coef: float = 1
-    total_epoch: int = max(int(100/gradient_steps),1000)
+    total_epoch: int = max(int(100/gradient_steps),200)
     # max_train_perEp: int = 1
     # xa_init_gain: float = 1.
     optimizer_class: Type[th.optim.Optimizer] = th.optim.SGD
