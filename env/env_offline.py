@@ -122,7 +122,7 @@ class buildinggym_env():
         self.return_batch = torch.zeros(args.batch_size, 1).to('cuda')
         self.simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
         self.baseline = pd.read_csv('Data\\Day_mean.csv')
-        self.com = 26
+        self.com = 24
         # self.baseline['Time'] = pd.to_datetime(self.baseline['Time'], format='%m/%d/%Y %H:%M')
 
     def setup(self, algo):
