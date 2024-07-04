@@ -81,7 +81,7 @@ class Args:
     # """the batch size (computed in runtime)"""
     learning_starts: int = -1
     """the batch size (computed in runtime)"""    
-    train_frequency: int = 2000
+    train_frequency: int = 5
     """the batch size (computed in runtime)"""        
 
     device: str = 'cuda'
@@ -99,7 +99,7 @@ class Args:
     epsilon_decay: float = 0.98
     # clip_range_vf: Union[float, None] = None
     # normalize_advantage: bool = True
-    tau: float = 1
+    tau: float = 0.005
     target_policy_noise: float = 0.2
     noise_std: float = 0.2
     target_noise_clip: float = 5

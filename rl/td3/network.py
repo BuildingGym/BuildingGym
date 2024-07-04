@@ -406,7 +406,7 @@ class Agent(nn.Module):
     def init_weight(self, network):
         for m in network.modules():
             if isinstance(m, nn.Linear):
-                nn.init.normal(m.weight, mean=0, std = 0.1)
+                nn.init.normal(m.weight, mean=0, std = 0.9)
                 # nn.init.xavier_normal_(m.weight, gain=1)
                 # nn.init.orthogonal_(m.weight, gain=1)
                 if m.bias is not None:

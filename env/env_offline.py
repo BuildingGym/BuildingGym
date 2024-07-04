@@ -158,8 +158,8 @@ class buildinggym_env():
 
     def normalize_input_i(self, state):
         nor_min = np.array([22.8, 22, 0, 0, 0])
-        nor_mean = np.array([29.3, 27, 0.78, 0.58, 0.89])
-        std = np.array([2, 0.5, 0.39, 0.26, 0.26])
+        nor_mean = np.array([29.3, 25, 0.78, 0.58, 0.89])
+        std = np.array([2, 2, 0.39, 0.26, 0.26])
         # nor_min = np.array([0, 0, 0, 0, 0])
         nor_max = np.array([33.3, 27, 1, 1, 1])
         # nor_max = np.array([1, 1, 1, 1, 1])
@@ -262,7 +262,7 @@ class buildinggym_env():
         #     energy_reward = 2
         # else:
         #     energy_reward = -1
-        energy_reward = 1.5 - abs(actual_reduction - target_reduction) * 10
+        energy_reward = 10 - abs(actual_reduction - target_reduction) * 10
         # if energy_reward<-5:
         #     energy_reward = -5
         return energy_reward, actual_reduction, baseline_i
@@ -297,7 +297,7 @@ class buildinggym_env():
             # if random.random() < 1.1:
                 actions = torch.FloatTensor(actions.shape).uniform_(-1, 1).to(device=self.args.device, dtype=actions.dtype)
                 # actions = torch.rand(actions.shape, device=self.args.device, dtype = actions.dtype)
-            self.com = 24 +  actions.cpu().item() * 3
+            self.com +=  actions.cpu().item() * 0.5
             self.com = max(min(self.com, 27), 23)
             # self.com = 27
             obs = pd.DataFrame(obs, index = [self.sensor_index])                
@@ -365,10 +365,10 @@ class buildinggym_env():
                         #     self.v_loss_list.append(v_loss_i)
 
 
-                # if i % self.args.train_frequency == 0 and self.buffer.buffer_size>self.args.batch_size and self.train:
-                #     self.actor_losses_i, self.critic_losses_i = self.algo.train()
-                #     if not math.isnan(self.actor_losses_i):
-                #         self.p_loss_list.append(self.actor_losses_i)
-                #     self.v_loss_list.append(self.critic_losses_i)                    
+                if i % self.args.train_frequency == 0 and self.buffer.buffer_size>self.args.batch_size and self.train:
+                    self.actor_losses_i, self.critic_losses_i = self.algo.train()
+                    if not math.isnan(self.actor_losses_i):
+                        self.p_loss_list.append(self.actor_losses_i)
+                    self.v_loss_list.append(self.critic_losses_i)                    
 
             self.sensor_index+=1

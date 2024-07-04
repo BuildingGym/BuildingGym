@@ -358,14 +358,14 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             # if not rollout.continue_training:
             #     break
 
-            if self.num_timesteps > 0 and self.num_timesteps > self.learning_starts:
-                # If no `gradient_steps` is specified,
-                # do as many gradients steps as steps performed during the rollout
-                # gradient_steps = self.gradient_steps if self.gradient_steps >= 0 else rollout.episode_timesteps
-                # Special case when the user passes `gradient_steps=0`
-                if self.gradient_steps > 0:
-                    self.actor_losses_i, self.critic_losses_i = self.train()
-                    callback.on_epoch_end()
+            # if self.num_timesteps > 0 and self.num_timesteps > self.learning_starts:
+            #     # If no `gradient_steps` is specified,
+            #     # do as many gradients steps as steps performed during the rollout
+            #     # gradient_steps = self.gradient_steps if self.gradient_steps >= 0 else rollout.episode_timesteps
+            #     # Special case when the user passes `gradient_steps=0`
+            #     if self.gradient_steps > 0:
+            #         self.actor_losses_i, self.critic_losses_i = self.train()
+            #         callback.on_epoch_end()
 
         callback.on_training_end()
 
