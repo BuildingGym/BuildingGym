@@ -120,8 +120,8 @@ class ReplayBuffer():
         last_gae_lam = 0
         for step in reversed(range(self.buffer_size)):
             if step == self.buffer_size - 1:
-                next_non_terminal = 0
-                next_values = 0
+                next_non_terminal = 1
+                next_values = self.values[step]
             else:
                 next_non_terminal = 1
                 next_values = self.values[step + 1]
@@ -150,7 +150,7 @@ class ReplayBuffer():
                 if not isinstance(getattr(self, i)[0], torch.Tensor):
                     data.append(np.expand_dims(np.array(getattr(self, i))[batch_inds.tolist()], 1))
                 else:
-                    data.append(j[batch_inds.tolist()].unsquare_(1))
+                    data.append(j[batch_inds.tolist()].unsqueeze_(1))
             else:
                 data.append(j[batch_inds.tolist()])
         # data = [np.array(getattr(self, i))[:, batch_inds]for i in self.info]

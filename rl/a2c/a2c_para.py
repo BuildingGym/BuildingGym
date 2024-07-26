@@ -14,7 +14,7 @@ class Args:
     """if toggled, `torch.backends.cudnn.deterministic=False`"""
     cuda: bool = True
     """if toggled, cuda will be enabled by default"""
-    track: bool = False
+    track: bool = True
     """if toggled, this experiment will be tracked with Weights and Biases"""
     wandb_project_name: str = "energygym-a2c"
     """the wandb's project name"""
@@ -29,13 +29,13 @@ class Args:
     n_time_step: int = 6
     """the number of steps in one hour"""    
 
-    learning_rate: float = 0.01
-    alpha: float = 0.9
-    outlook_steps: int = 12
-    step_size: int = 2
-    batch_size: int = 12
+    learning_rate: float = 0.001
+    alpha: float = 0.99
+    outlook_steps: int = 6
+    step_size: int = 1
+    batch_size: int = 6
     n_steps: int = 2
-    gamma: float = 0.1
+    gamma: float = 0.9
     gae_lambda: float = 1
     ent_coef: float = 0
     vf_coef: float = 0.5
@@ -44,8 +44,8 @@ class Args:
     sde_sample_freq: int = -1
     # train_perEp: int = 1
     pol_coef: float = 1
-    total_epoch: int = 1
-    max_train_perEp: int = 1
-    xa_init_gain: float = 1.
+    total_epoch: int = 200
+    # max_train_perEp: int = 1
+    # xa_init_gain: float = 1.
     optimizer_class: Type[th.optim.Optimizer] = th.optim.RMSprop
 

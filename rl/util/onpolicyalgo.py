@@ -11,6 +11,8 @@ from rl.util.base_class import BaseAlgorithm
 from rl.util.replaybuffer import ReplayBuffer
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.policies import ActorCriticPolicy
+from rl.util.callback import mycallback
+
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
 from stable_baselines3.common.utils import obs_as_tensor, safe_mean
 from stable_baselines3.common.vec_env import VecEnv
@@ -357,7 +359,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         tb_log_name: str = "OnPolicyAlgorithm",
         reset_num_timesteps: bool = True,
         progress_bar: bool = False,
-        max_train_perEp: int = 10
+        # max_train_perEp: int = 10
     ) -> SelfOnPolicyAlgorithm:
         iteration = 0
 
@@ -368,6 +370,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             tb_log_name,
             progress_bar,
         )
+        callback = mycallback(self)
 
         callback.on_training_start(locals(), globals())
 
