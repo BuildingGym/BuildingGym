@@ -32,6 +32,9 @@ class mycallback(BaseCallback):
         if not math.isnan(self.model.actor_losses_i):
             wandb.log({'p_loss_curve': float(self.model.actor_losses_i)}, step=self.num_timesteps)
 
+    def _on_step(self):
+        pass
+    
     def per_time_step(self, var = None) -> None:
         # super().on_epoch_end()
         if var is not None:
