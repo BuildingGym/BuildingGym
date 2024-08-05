@@ -1,5 +1,5 @@
 # from env.env_new_r import buildinggym_env
-from env.env import buildinggym_env
+from env.env_offline import buildinggym_env
 import gymnasium as _gymnasium_
 from energyplus.ooep.addons.rl import (
     VariableBox,
@@ -11,7 +11,7 @@ from energyplus.ooep import (
     OutputVariable,
 )
 
-from rl.a2c.network import Agent
+from rl.td3.network import Agent
 from rl.util.schedule import ConstantSchedule
 from gymnasium.spaces import (
     Box,
@@ -19,8 +19,8 @@ from gymnasium.spaces import (
 )
 import numpy as _numpy_
 import numpy as np
-from rl.a2c.a2c_para import Args
-from rl.a2c.a2c import A2C
+from rl.td3.td3_para import Args
+from rl.td3.td3 import TD3
 from stable_baselines3.common.callbacks import BaseCallback
 import wandb
 import tyro
@@ -120,7 +120,7 @@ action_space = _gymnasium_.spaces.Dict({
                         key='Always 26',
                     ))
                 })
-schedule = ConstantSchedule(0.0001)
+# schedule = ConstantSchedule(0.0001)
 input_sp = Box(np.array([0] * 5), np.array([1] * 5))
 # action_sp = Box(np.array([0, -0.5]), np.array([1, 0.5]))
 action_sp = Discrete(3)
@@ -128,14 +128,15 @@ if isinstance(action_sp, Discrete):
     action_dim = action_sp.n
 elif isinstance(action_sp, Box):
     action_dim = action_sp.shape[0]
-agent = Agent(input_sp, action_sp, schedule.value)
+# agent = Agent(input_sp, action_sp, schedule.value)
+args = tyro.cli(Args)
 env = buildinggym_env('Small office-1A-Long.idf',
                     'USA_FL_Miami.722020_TMY2.epw',
                     observation_space,
                     action_space,
                     input_sp.shape[0],
                     action_sp,
-                    Args)
+                    args)
 
 # class callback(BaseCallback):
 #     def __init__(self, verbose: int = 0):
@@ -147,14 +148,17 @@ env = buildinggym_env('Small office-1A-Long.idf',
 #         reward = np.mean(self.model.env.sensor_dic['rewards'].iloc[np.where(env.sensor_dic['Working time'])[0]])
 #         prob = np.mean(np.exp(self.model.env.sensor_dic['logprobs'].iloc[np.where(env.sensor_dic['Working time'])[0]]))
 #         p_loss = np.mean(self.model.env.p_loss_list)
-#         v_loss = self.model.env.v_loss
+#         # v_loss = self.model.env.v_loss
 #         # prob = self.model.env.prob
 #         lr = self.model.learning_rate
 #         wandb.log({'reward_curve': reward}, step=self.num_timesteps)        
 #         wandb.log({'result_curve': result}, step=self.num_timesteps)
 #         wandb.log({'action prob': prob}, step=self.num_timesteps)
 #         wandb.log({'p_loss_curve': float(p_loss)}, step=self.num_timesteps)
-#         wandb.log({'v_loss_curve': float(v_loss)}, step=self.num_timesteps)      
+#         # wandb.log({'v_loss_curve': float(v_loss)}, step=self.num_timesteps)
+
+#     def on_epoch_end(self):
+#         wandb.log({'reward_curve': self.model.policy}, step=self.num_timesteps)    
 
 #     def per_time_step(self, var = None) -> None:
 #         # super().on_epoch_end()
@@ -164,15 +168,14 @@ env = buildinggym_env('Small office-1A-Long.idf',
 
 
 # my_callback = callback()
-args = tyro.cli(Args)
 run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 
 
-a = A2C(Agent,
+a = TD3(Agent,
         env,
-        Args,
+        args,
         run_name,
-        # my_callback,
+        None,
         policy_kwargs = {'optimizer_class': args.optimizer_class},
         # max_train_perEp = args.max_train_perEp,
         )

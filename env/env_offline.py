@@ -8,8 +8,8 @@ import time
 from energyplus import ooep
 import torch.nn.functional as F
 import os
-from stable_baselines3.common.buffers import ReplayBuffer
 import wandb
+import math
 import tyro
 from torch.utils.tensorboard import SummaryWriter
 import torch.optim as optim
@@ -36,7 +36,7 @@ from energyplus.ooep import (
     OutputVariable,
 )
 from energyplus.ooep.addons.rl.gymnasium import ThinEnv
-# from energyplus.dataset.basic import dataset as _epds_
+from energyplus.dataset.basic import dataset as _epds_
 import torch.nn as nn
 import wandb
 from rl.util.replaybuffer import ReplayBuffer
@@ -57,6 +57,22 @@ async def energyplus_running(simulator, idf_file, epw_file):
         ),
     ) 
 
+# def energyplus_running(simulator, idf_file, epw_file):
+#     simulator.run(
+#         input=Simulator.InputSpecs(
+#             model=(
+#                 idf_file
+#             ),
+#             weather=(epw_file),
+#         ),
+#         output=Simulator.OutputSpecs(
+#             #report=('/tmp/ooep-report-9e1287d2-8e75-4cf5-bbc5-f76580b56a69'),
+#         ),
+#         options=Simulator.RuntimeOptions(
+#             #design_day=True,
+#         ),
+#     ) 
+
 class buildinggym_env():
     def __init__(self, idf_file,
                  epw_file,
@@ -64,7 +80,7 @@ class buildinggym_env():
                  action_space,
                  observation_dim,
                  action_type,
-                 args,
+                 args=None,
                  agent = None) -> None:
         global thinenv
         self.simulator = Simulator().add(
@@ -72,7 +88,7 @@ class buildinggym_env():
             #LogProvider(),
         )
         self.buffer = ReplayBuffer(
-            info=['obs', 'action', 'logprbs', 'rewards', 'values'],
+            info=['obs', 'actions', 'rewards', 'nxt_obs'],
             args=args
             )
         self.idf_file = idf_file
@@ -96,7 +112,7 @@ class buildinggym_env():
         self.num_envs = 1
         self.agent = agent
         self.ready_to_train = False
-        self.args = tyro.cli(args)
+        self.args = args
         self.p_loss_list = []
         self.v_loss_list = []
         self.success_n = 0
@@ -106,7 +122,7 @@ class buildinggym_env():
         self.return_batch = torch.zeros(args.batch_size, 1).to('cuda')
         self.simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
         self.baseline = pd.read_csv('Data\\Day_mean.csv')
-        self.com = 25
+        self.com = 24
         # self.baseline['Time'] = pd.to_datetime(self.baseline['Time'], format='%m/%d/%Y %H:%M')
 
     def setup(self, algo):
@@ -114,7 +130,9 @@ class buildinggym_env():
         self.agent = self.algo.policy
         self.ready_to_train = True
         
-    def run(self, agent = None):
+    def run(self, agent = None, epsilon: float = 0, train: bool = True):
+        self.epsilon = epsilon
+        self.train = train
         self.sensor_index = 0
         # if agent is not None:
         #     self.agent = agent
@@ -140,13 +158,13 @@ class buildinggym_env():
 
     def normalize_input_i(self, state):
         nor_min = np.array([22.8, 22, 0, 0, 0])
-        nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89])
-        std = np.array([2.17, 0.5, 0.39, 0.26, 0.26])
+        nor_mean = np.array([29.3, 25, 0.78, 0.58, 0.89])
+        std = np.array([2, 2, 0.39, 0.26, 0.26])
         # nor_min = np.array([0, 0, 0, 0, 0])
         nor_max = np.array([33.3, 27, 1, 1, 1])
         # nor_max = np.array([1, 1, 1, 1, 1])
         return (state- nor_mean)/std
-        return (state- nor_min)/(nor_max - nor_min)
+        # return (state- nor_min)/(nor_max - nor_min)
         # return (state - np.array([27, 25, 0.5, 0.5, 0.5]))/np.array([3, 1, 0.2, 0.2, 0.2])
     
     def label_working_time(self):
@@ -244,7 +262,7 @@ class buildinggym_env():
         #     energy_reward = 2
         # else:
         #     energy_reward = -1
-        energy_reward = 1.5 - abs(actual_reduction - target_reduction) * 10
+        energy_reward = 10 - abs(actual_reduction - target_reduction) * 10
         # if energy_reward<-5:
         #     energy_reward = -5
         return energy_reward, actual_reduction, baseline_i
@@ -271,13 +289,17 @@ class buildinggym_env():
             state = [float(obs[i]) for i in self.observation_var]
             cooling_energy =  obs['Energy_1'].item() + obs['Energy_2'].item() + obs['Energy_3'].item() + obs['Energy_4'].item() + obs['Energy_5'].item()
             state = self.normalize_input_i(state)
-            state = torch.Tensor(state).cuda() if torch.cuda.is_available() and self.args.cuda else torch.Tensor(state).cpu()
+            state = torch.Tensor(state).cuda() if torch.cuda.is_available() and self.args.device == 'cuda'  else torch.Tensor(state).cpu()
             with torch.no_grad():
-                actions, value, logprob = self.agent(state)
+                actions = self.agent(state)
                 # actions = torch.argmax(q_values, dim=0).cpu().item()
-            self.com +=  (actions.cpu().item()-1)*0.5
+            if random.random() < self.epsilon:
+            # if random.random() < 1.1:
+                actions = torch.FloatTensor(actions.shape).uniform_(-1, 1).to(device=self.args.device, dtype=actions.dtype)
+                # actions = torch.rand(actions.shape, device=self.args.device, dtype = actions.dtype)
+            self.com +=  actions.cpu().item() * 0.5
             self.com = max(min(self.com, 27), 23)
-            # self.com = 26
+            # self.com = 27
             obs = pd.DataFrame(obs, index = [self.sensor_index])                
             obs.insert(0, 'Time', t)
             obs.insert(0, 'day_of_week', t.weekday())
@@ -289,54 +311,64 @@ class buildinggym_env():
             obs['rewards'] = reward_i
             obs['baseline'] = baseline_i
             obs.insert(obs.columns.get_loc("t_in") + 1, 'actions', actions.cpu().item())
-            obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().item())
-            obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value.cpu().item())
+            # obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().item())
+            # obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value.cpu().item())
 
 
             if self.sensor_index == 0:
                 self.sensor_dic = pd.DataFrame({})
                 self.sensor_dic = obs
-                self.logprobs = [logprob]
+                # self.logprobs = [logprob]
                 # self.values = [value]
                 self.actions = [actions]
                 self.states = [state]
-                self.values = [value]
+                # self.values = [value]
                 self.rewards = [reward_i]
             else:
                 self.sensor_dic = pd.concat([self.sensor_dic, obs])           
-                self.logprobs.append(logprob) 
+                # self.logprobs.append(logprob) 
                 # self.values.append(value) 
                 self.actions.append(actions)
                 self.states.append(state)
-                self.values.append(value)
+                # self.values.append(value)
                 self.rewards.append(reward_i)
             actions = actions.cpu().item()
             # com = 25. + actions * 2
             act = thinenv.act({'Thermostat': self.com})
-            # act = thinenv.act({'Thermostat': 26})
+            # act = thinenv.act({'Thermostat': 26.2})
 
             b  = self.args.outlook_steps + 1
+            # self.buffer.add([self.states[i], self.actions[i], self.logprobs[i], r_i, value])   # List['obs', 'action', 'logprb', 'rewards', 'values']
+
             if self.sensor_index > b:
                 i = self.sensor_index-b
                 if i % self.args.step_size == 0:
                     if np.sum(self.sensor_dic['Working time'].iloc[i:(self.sensor_index)]) == b:
                         ob_i = self.states[i]
+                        ob_nxt_i = self.states[i+1]
                         r_i = self.rewards[i+1]
-                        logp_i = self.logprobs[i]
+                        # logp_i = self.logprobs[i]
                         action_i = self.actions[i]
                         R_i = self.cal_return(self.rewards[i+1:i+b])
-                        if self.batch_n<self.args.batch_size:
-                            self.buffer.add([ob_i, action_i, logp_i, r_i, value])   # List['obs', 'action', 'logprb', 'rewards', 'values']
+                        # if self.batch_n<self.args.batch_size:
+                        self.buffer.add([ob_i, action_i, r_i, ob_nxt_i], max_buffer_size = self.args.max_buffer_size)  # List['obs', 'actions', 'rewards', 'nxt_obs']
                             # self.obs_batch[self.batch_n, :] = ob_i
                             # self.return_batch[self.batch_n, :] = R_i
                             # self.action_batch[self.batch_n, :] = action_i
-                            self.batch_n+=1
-                        else:
-                            self.batch_n=0
-                            self.buffer.cal_R_adv()
-                            p_loss_i, v_loss_i = self.algo.train(self.buffer)
-                            self.buffer.reset()  # dxl: can update to be able to store somme history info
-                            self.p_loss_list.append(p_loss_i)
-                            self.v_loss_list.append(v_loss_i)
-                            
+                        #     self.batch_n+=1
+                        # else:
+                        #     self.batch_n=0
+                        #     self.buffer.cal_R_adv()
+                        #     p_loss_i, v_loss_i = self.algo.train(self.buffer)
+                        #     self.buffer.reset()  # dxl: can update to be able to store somme history info
+                        #     self.p_loss_list.append(p_loss_i)
+                        #     self.v_loss_list.append(v_loss_i)
+
+
+                if i % self.args.train_frequency == 0 and self.buffer.buffer_size>self.args.batch_size and self.train:
+                    self.actor_losses_i, self.critic_losses_i = self.algo.train()
+                    if not math.isnan(self.actor_losses_i):
+                        self.p_loss_list.append(self.actor_losses_i)
+                    self.v_loss_list.append(self.critic_losses_i)                    
+
             self.sensor_index+=1

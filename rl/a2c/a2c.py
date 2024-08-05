@@ -72,7 +72,7 @@ class A2C(OnPolicyAlgorithm):
         policy: Union[str, Type[Agent]],
         env: buildinggym_env,
         args: Args,
-        my_callback = None,
+        run_name = None,
         learning_rate: Union[float, Schedule] = 1e-4,
         n_steps: int = 5,
         batch_size: int = 64,
@@ -81,12 +81,12 @@ class A2C(OnPolicyAlgorithm):
         ent_coef: float = 0,
         vf_coef: float = 0.5,
         max_grad_norm: float = 10,
-        max_train_perEp: int = 100,
+        # max_train_perEp: int = 100,
         rms_prop_eps: float = 1e-5,
         use_rms_prop: bool = True,
         use_sde: bool = False,
         sde_sample_freq: int = -1,
-        buffer_info: List[str] = ['observations', 'actions', 'rewards', 'logprobs'],
+        buffer_info: List[str] = ['observations', 'actions', 'rewards', 'logprobs', 'values'],
         rollout_buffer_class: Optional[Type[RolloutBuffer]] = None,
         rollout_buffer_kwargs: Optional[Dict[str, Any]] = None,
         normalize_advantage: bool = False,
@@ -99,7 +99,7 @@ class A2C(OnPolicyAlgorithm):
         _init_setup_model: bool = True,
     ):
         self.args = tyro.cli(Args)
-        self.my_callback = my_callback
+        # self.my_callback = my_callback
         self.sweep_config = self.args
         super().__init__(
             policy,
@@ -132,10 +132,11 @@ class A2C(OnPolicyAlgorithm):
                 spaces.MultiBinary,
             ),
         )
+        self.run_name = run_name
 
         self.normalize_advantage = normalize_advantage
         self.observation_var = env.observation_var
-        self.max_train_perEp = max_train_perEp
+        # self.max_train_perEp = max_train_perEp
 
         # Update optimizer inside the policy if we want to use RMSProp
         # (original implementation) rather than Adam
@@ -146,11 +147,15 @@ class A2C(OnPolicyAlgorithm):
         if _init_setup_model:
             self._setup_model()
 
-    def train(self, obs, actions, returns) -> None:
+    def train(self, buffer) -> None:
         """
         Update policy using the currently gathered
         rollout buffer (one gradient step over whole data).
         """
+        train_input, R, adv = buffer.get(self.args.batch_size)
+        obs = train_input[0]
+        actions = train_input[1]
+        advantages = adv
         # Switch to train mode (this affects batch norm / dropout)
         self.policy.set_training_mode(True)
 
@@ -173,7 +178,6 @@ class A2C(OnPolicyAlgorithm):
         values = values.flatten()
 
         # Normalize advantage (not present in the original implementation)
-        advantages = returns
         if self.normalize_advantage:
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
@@ -181,7 +185,7 @@ class A2C(OnPolicyAlgorithm):
         policy_loss = -(advantages * log_prob).mean()
 
         # Value loss using the TD(gae_lambda) target
-        value_loss = F.mse_loss(returns.squeeze(), values)
+        value_loss = F.mse_loss(R.squeeze(), values)
 
         # Entropy loss favor exploration
         if entropy is None:
@@ -226,7 +230,7 @@ class A2C(OnPolicyAlgorithm):
         tb_log_name: str = "A2C",
         reset_num_timesteps: bool = False,
         progress_bar: bool = False,
-        max_train_perEp: int = 100,
+        # max_train_perEp: int = 100,
     ) -> SelfA2C:
         _, performance =  super().learn(
             total_timesteps=total_timesteps,
@@ -235,7 +239,7 @@ class A2C(OnPolicyAlgorithm):
             tb_log_name=tb_log_name,
             reset_num_timesteps=reset_num_timesteps,
             progress_bar=progress_bar,
-            max_train_perEp=self.max_train_perEp
+            # max_train_perEp=self.max_train_perEp
         )
         return _, performance
     
@@ -246,11 +250,11 @@ class A2C(OnPolicyAlgorithm):
                 entity=self.args.wandb_entity,
                 sync_tensorboard=True,
                 config=self.sweep_config,
-                # name=self.run_name,
+                name=self.run_name,
                 save_code=True,
             ):
             self.args = wandb.config
             for k, v in tyro.cli(Args).__dict__.items():
                 if k not in self.args:
                     self.args[str(k)] = v
-            self.learn(self.args.total_epoch, self.my_callback, max_train_perEp = self.args.max_train_perEp)
+            self.learn(self.args.total_epoch, self.my_callback)

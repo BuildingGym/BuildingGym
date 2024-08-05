@@ -166,7 +166,8 @@ class FEBuild(nn.Module):
         self.latent_dim_vf = last_layer_dim_vf
 
     def extract_features(self, features: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
-
+        if features.dtype == th.float64:
+            features = features.to(dtype=th.float32)
         return self.policy_fe(features), self.value_fe(features)
 
     

@@ -1,0 +1,3 @@
+pg：already fine tune
+a2c: dry-run ready, not fine tune
+ppo: training stratege seems different with a2c. Try same with a2c first to see performance. if not good, then try to go back to strategy as stable_baselines
