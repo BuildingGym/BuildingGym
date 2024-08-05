@@ -86,11 +86,11 @@ class Args:
 
     learning_rate: float = 0.001
     n_epochs: int = 2
-    alpha: float = 0.99
+    alpha: float = 0.9
     outlook_steps: int = 6
     step_size: int = 1
     batch_size: int = 6
-    n_steps: int = 2
+    n_steps: int = 20
     gamma: float = 0.9
     gae_lambda: float = 0.95
     ent_coef: float = 0
