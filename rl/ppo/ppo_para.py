@@ -24,7 +24,6 @@ class Args:
     # Algorithm specific arguments
     env_id: str = "EnergyGym-ppo-v1"
     """the id of the environment"""
-    n_epochs: int = 1
     """training time of per epoch"""
     input_dim: int = 5
     """the id of the environment"""
@@ -86,13 +85,14 @@ class Args:
     """the batch size (computed in runtime)"""        
 
     learning_rate: float = 0.001
+    n_epochs: int = 2
     alpha: float = 0.99
     outlook_steps: int = 6
     step_size: int = 1
     batch_size: int = 6
     n_steps: int = 2
     gamma: float = 0.9
-    gae_lambda: float = 1
+    gae_lambda: float = 0.95
     ent_coef: float = 0
     vf_coef: float = .5
     max_grad_norm: float = 50

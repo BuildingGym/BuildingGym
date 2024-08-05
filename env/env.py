@@ -101,6 +101,7 @@ class buildinggym_env():
         self.v_loss_list = []
         self.success_n = 0
         self.batch_n = 0
+        self.step_n = 0
         self.obs_batch = torch.zeros(args.batch_size, observation_dim).to('cuda')
         self.action_batch = torch.zeros(args.batch_size, 1).to('cuda')
         self.return_batch = torch.zeros(args.batch_size, 1).to('cuda')
@@ -325,7 +326,7 @@ class buildinggym_env():
                         logp_i = self.logprobs[i]
                         action_i = self.actions[i]
                         R_i = self.cal_return(self.rewards[i+1:i+b])
-                        if self.batch_n<self.args.batch_size:
+                        if self.batch_n< self.args.batch_size*self.args.n_steps:
                             self.buffer.add([ob_i, action_i, logp_i, r_i, value])   # List['obs', 'action', 'logprb', 'rewards', 'values']
                             # self.obs_batch[self.batch_n, :] = ob_i
                             # self.return_batch[self.batch_n, :] = R_i
@@ -333,7 +334,7 @@ class buildinggym_env():
                             self.batch_n+=1
                         else:
                             self.batch_n=0
-                            self.buffer.cal_R_adv()
+                            self.buffer.cal_R_adv(self.args.batch_size)
                             p_loss_i, v_loss_i = self.algo.train(self.buffer)
                             self.buffer.reset()  # dxl: can update to be able to store somme history info
                             self.p_loss_list.append(p_loss_i)

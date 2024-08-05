@@ -80,6 +80,13 @@ class ReplayBuffer():
         self.wt_label = []
         # super().reset()
 
+    def gather(self, batch_size):
+
+        start_idx = 0
+        while start_idx < self.buffer_size:
+            yield self.get(batch_size, start_idx)
+            start_idx += batch_size        
+
     def get(self, batch_size = None, start_idx = None, shuffle = False):
 
         if batch_size is None:
@@ -112,25 +119,59 @@ class ReplayBuffer():
                 idx.append(random.randint(0, self.buffer_size-1))
             return self._get_samples(np.array(idx))    
         
-    def cal_R_adv(self):
+    def cal_R_adv(self, len_seq = None):
         # Convert to numpy
         # last_values = last_values.clone().cpu().numpy().flatten()
         assert 'values' in self.info
-        self.advantages = [0]*self.buffer_size
-        last_gae_lam = 0
-        for step in reversed(range(self.buffer_size)):
-            if step == self.buffer_size - 1:
-                next_non_terminal = 1
-                next_values = self.values[step]
-            else:
-                next_non_terminal = 1
-                next_values = self.values[step + 1]
-            delta = self.rewards[step] + self.args.gamma * next_values * next_non_terminal - self.values[step]
-            last_gae_lam = delta + self.args.gamma * self.args.gae_lambda * next_non_terminal * last_gae_lam
-            self.advantages[step] = last_gae_lam
-        # TD(lambda) estimator, see Github PR #375 or "Telescoping in TD(lambda)"
-        # in David Silver Lecture 4: https://www.youtube.com/watch?v=PnHCvfgC_ZA
-        self.returns = self.advantages + self.values
+        if len_seq == None:
+            self.advantages = [0]*self.buffer_size
+            last_gae_lam = 0
+            for step in reversed(range(self.buffer_size)):
+                if step == self.buffer_size - 1:
+                    next_non_terminal = 1
+                    next_values = self.values[step]
+                else:
+                    next_non_terminal = 1
+                    next_values = self.values[step + 1]
+                delta = self.rewards[step] + self.args.gamma * next_values * next_non_terminal - self.values[step]
+                last_gae_lam = delta + self.args.gamma * self.args.gae_lambda * next_non_terminal * last_gae_lam
+                self.advantages[step] = last_gae_lam
+            # TD(lambda) estimator, see Github PR #375 or "Telescoping in TD(lambda)"
+            # in David Silver Lecture 4: https://www.youtube.com/watch?v=PnHCvfgC_ZA
+            self.returns = self.advantages + self.values
+            a = 1
+        else:
+            self.returns = []
+            self.advantages = []
+            for i in range(int(self.buffer_size/len_seq)):
+                self.advantages_i = [0]*len_seq
+                last_gae_lam = 0
+                values_list_i = self.values[i*len_seq : (i+1)*len_seq]
+                rewards_list_i = self.rewards[i*len_seq : (i+1)*len_seq]
+                for step in reversed(range(len_seq)):
+                    if step == len_seq - 1:
+                        next_non_terminal = 1
+                        next_values = values_list_i[step]
+                    else:
+                        next_non_terminal = 1
+                        next_values = values_list_i[step + 1]
+                    delta = rewards_list_i[step] + self.args.gamma * next_values * next_non_terminal - values_list_i[step]
+                    last_gae_lam = delta + self.args.gamma * self.args.gae_lambda * next_non_terminal * last_gae_lam
+                    self.advantages_i[step] = last_gae_lam
+                # TD(lambda) estimator, see Github PR #375 or "Telescoping in TD(lambda)"
+                # in David Silver Lecture 4: https://www.youtube.com/watch?v=PnHCvfgC_ZA
+                self.returns_i = torch.tensor(self.advantages_i) + torch.tensor(values_list_i)
+                self.returns.append(self.returns_i)
+                self.advantages.append(self.advantages_i)
+            self.returns = [j for sub in self.returns for j in sub]
+            self.advantages = [j for sub in self.advantages for j in sub]
+            if self.args.cuda:
+                self.returns = [tensor.cuda() for tensor in self.returns]
+                self.advantages = [tensor.cuda() for tensor in self.advantages]
+                # torch.tensor(self.returns, device='cuda')
+            a = 1
+
+
 
     def _get_samples(
         self,
