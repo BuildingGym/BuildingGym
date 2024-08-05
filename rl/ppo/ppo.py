@@ -100,7 +100,7 @@ class PPO(OnPolicyAlgorithm):
         ent_coef: float = 0.0,
         vf_coef: float = 0.5,
         max_grad_norm: float = 0.5,
-        max_train_perEp: int = 100,
+        # max_train_perEp: int = 100,
         use_sde: bool = False,
         sde_sample_freq: int = -1,
         buffer_info: List[str] = ['observations', 'actions', 'rewards', 'logprobs', 'values'],
@@ -181,7 +181,7 @@ class PPO(OnPolicyAlgorithm):
         self.clip_range_vf = clip_range_vf
         self.normalize_advantage = normalize_advantage
         self.target_kl = target_kl
-        self.max_train_perEp = max_train_perEp
+        # self.max_train_perEp = max_train_perEp
 
         if _init_setup_model:
             self._setup_model()
@@ -332,7 +332,7 @@ class PPO(OnPolicyAlgorithm):
         tb_log_name: str = "PPO",
         reset_num_timesteps: bool = True,
         progress_bar: bool = False,
-        max_train_perEp: int = 100,
+        # max_train_perEp: int = 100,
     ) -> SelfPPO:
         return super().learn(
             total_timesteps=total_timesteps,
@@ -341,7 +341,7 @@ class PPO(OnPolicyAlgorithm):
             tb_log_name=tb_log_name,
             reset_num_timesteps=reset_num_timesteps,
             progress_bar=progress_bar,
-            max_train_perEp=self.max_train_perEp,
+            # max_train_perEp=self.max_train_perEp,
         )
     
     def train_auto_fine_tune(self,
@@ -358,4 +358,4 @@ class PPO(OnPolicyAlgorithm):
             for k, v in tyro.cli(Args).__dict__.items():
                 if k not in self.args:
                     self.args[str(k)] = v
-            self.learn(self.args.total_epoch, self.my_callback, max_train_perEp = self.args.max_train_perEp)    
+            self.learn(self.args.total_epoch, self.my_callback)    

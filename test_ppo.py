@@ -172,9 +172,9 @@ a = PPO(Agent,
         env,
         Args,
         run_name,
-        None,
+        # None,
         policy_kwargs = {'optimizer_class': args.optimizer_class},
-        max_train_perEp = args.max_train_perEp,
+        # max_train_perEp = args.max_train_perEp,
         )
 env.setup(algo=a)
 
