@@ -137,33 +137,33 @@ env = buildinggym_env('Small office-1A-Long.idf',
                     action_sp,
                     Args)
 
-class callback(BaseCallback):
-    def __init__(self, verbose: int = 0):
-        super().__init__(verbose)
+# class callback(BaseCallback):
+#     def __init__(self, verbose: int = 0):
+#         super().__init__(verbose)
 
-    def on_rollout_end(self) -> None:
-        super().on_rollout_end()
-        result = np.mean(self.model.env.sensor_dic['results'].iloc[np.where(env.sensor_dic['Working time'])[0]])
-        reward = np.mean(self.model.env.sensor_dic['rewards'].iloc[np.where(env.sensor_dic['Working time'])[0]])
-        prob = np.mean(np.exp(self.model.env.sensor_dic['logprobs'].iloc[np.where(env.sensor_dic['Working time'])[0]]))
-        p_loss = np.mean(self.model.env.loss_list)
-        # v_loss = self.model.env.v_loss
-        # prob = self.model.env.prob
-        lr = self.model.learning_rate
-        wandb.log({'reward_curve': reward}, step=self.num_timesteps)        
-        wandb.log({'result_curve': result}, step=self.num_timesteps)
-        wandb.log({'action prob': prob}, step=self.num_timesteps)
-        wandb.log({'p_loss_curve': float(p_loss)}, step=self.num_timesteps)
-        # wandb.log({'v_loss_curve': float(v_loss)}, step=self.num_timesteps)      
+#     def on_rollout_end(self) -> None:
+#         super().on_rollout_end()
+#         result = np.mean(self.model.env.sensor_dic['results'].iloc[np.where(env.sensor_dic['Working time'])[0]])
+#         reward = np.mean(self.model.env.sensor_dic['rewards'].iloc[np.where(env.sensor_dic['Working time'])[0]])
+#         prob = np.mean(np.exp(self.model.env.sensor_dic['logprobs'].iloc[np.where(env.sensor_dic['Working time'])[0]]))
+#         p_loss = np.mean(self.model.env.loss_list)
+#         # v_loss = self.model.env.v_loss
+#         # prob = self.model.env.prob
+#         lr = self.model.learning_rate
+#         wandb.log({'reward_curve': reward}, step=self.num_timesteps)        
+#         wandb.log({'result_curve': result}, step=self.num_timesteps)
+#         wandb.log({'action prob': prob}, step=self.num_timesteps)
+#         wandb.log({'p_loss_curve': float(p_loss)}, step=self.num_timesteps)
+#         # wandb.log({'v_loss_curve': float(v_loss)}, step=self.num_timesteps)      
 
-    def per_time_step(self, var = None) -> None:
-        # super().on_epoch_end()
-        if var is not None:
-            p_loss = var['loss'].item()
-            # wandb.log({'p_loss_curve': float(p_loss)}, step=self.num_timesteps)       
+#     def per_time_step(self, var = None) -> None:
+#         # super().on_epoch_end()
+#         if var is not None:
+#             p_loss = var['loss'].item()
+#             # wandb.log({'p_loss_curve': float(p_loss)}, step=self.num_timesteps)       
 
 
-my_callback = callback()
+# my_callback = callback()
 args = tyro.cli(Args)
 run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 
@@ -172,9 +172,9 @@ a = pg(Agent,
         env,
         Args,
         run_name,
-        my_callback,
+        # my_callback,
         policy_kwargs = {'optimizer_class': args.optimizer_class},
-        max_train_perEp = args.max_train_perEp,
+        # max_train_perEp = args.max_train_perEp,
         )
 env.setup(algo=a)
 
@@ -186,7 +186,7 @@ wandb.init(
     name=run_name,
     save_code=False,
 )
-_, performance = a.learn(args.total_epoch, my_callback)
+_, performance = a.learn(args.total_epoch, None)
 
 
 

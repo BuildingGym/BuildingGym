@@ -35,6 +35,7 @@ class Args:
     step_size: int = 2
     shuffle: bool = True
     batch_size: int = 1
+    n_steps: int = 1
     # n_steps: int = 2
     gamma: float = 0.5
     # gae_lambda: float = 1

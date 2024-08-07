@@ -82,7 +82,7 @@ class pg(OnPolicyAlgorithm):
         ent_coef: float = 0,
         # vf_coef: float = 0.5,
         max_grad_norm: float = 10,
-        max_train_perEp: int = 100,
+        # max_train_perEp: int = 100,
         rms_prop_eps: float = 1e-5,
         use_rms_prop: bool = True,
         use_sde: bool = False,
@@ -136,7 +136,7 @@ class pg(OnPolicyAlgorithm):
 
         self.normalize_advantage = normalize_advantage
         self.observation_var = env.observation_var
-        self.max_train_perEp = max_train_perEp
+        # self.max_train_perEp = max_train_perEp
         self.run_name = run_name
         # Update optimizer inside the policy if we want to use RMSProp
         # (original implementation) rather than Adam
@@ -237,7 +237,7 @@ class pg(OnPolicyAlgorithm):
         tb_log_name: str = "A2C",
         reset_num_timesteps: bool = False,
         progress_bar: bool = False,
-        max_train_perEp: int = 100,
+        # max_train_perEp: int = 100,
     ):
         _, performance =  super().learn(
             total_timesteps=self.args.total_epoch,
@@ -246,7 +246,7 @@ class pg(OnPolicyAlgorithm):
             tb_log_name=tb_log_name,
             reset_num_timesteps=reset_num_timesteps,
             progress_bar=progress_bar,
-            max_train_perEp=self.max_train_perEp
+            # max_train_perEp=self.max_train_perEp
         )
         return _, performance
     
@@ -264,4 +264,4 @@ class pg(OnPolicyAlgorithm):
             for k, v in tyro.cli(Args).__dict__.items():
                 if k not in self.args:
                     self.args[str(k)] = v
-            self.learn(self.args.total_epoch, self.my_callback, max_train_perEp = self.args.max_train_perEp)
+            self.learn(self.args.total_epoch, self.my_callback)

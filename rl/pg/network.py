@@ -173,7 +173,7 @@ class Agent(nn.Module):
         actions = distribution.sample()
         log_prob = distribution.log_prob(actions)
         # actions = actions.reshape((-1, *self.action_space.n)) 
-        return actions, log_prob
+        return actions, None, log_prob
     
 
     def _get_action_dist_from_latent(self, latent_pi: th.Tensor) -> Distribution:

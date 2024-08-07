@@ -291,7 +291,8 @@ class buildinggym_env():
             obs['baseline'] = baseline_i
             obs.insert(obs.columns.get_loc("t_in") + 1, 'actions', actions.cpu().item())
             obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().item())
-            obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value.cpu().item())
+            if value is not None:
+                obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value.cpu().item())
 
 
             if self.sensor_index == 0:
