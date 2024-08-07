@@ -66,6 +66,7 @@ class ReplayBuffer():
         self.info = info
         self.device = device
         self.n_envs = n_envs
+        self.R_adv_attr = False
         self._reset()
 
     def reset(self):
@@ -96,13 +97,18 @@ class ReplayBuffer():
                 start_idx = 0
             assert start_idx<=self.buffer_size-batch_size
             idx = np.arange(start_idx, start_idx + batch_size)
-            return self._get_samples(idx),torch.stack(tuple([self.returns[i] for i in idx])), torch.stack(tuple([self.advantages[i] for i in idx]))
+            if self.R_adv_attr:
+                return self._get_samples(idx),torch.stack(tuple([self.returns[i] for i in idx])), torch.stack(tuple([self.advantages[i] for i in idx]))
+            else:
+                return self._get_samples(idx), None, None
         else:
             idx = []
             while len(idx)<batch_size:
                 idx.append(random.randint(0, self.buffer_size-1))
-            return self._get_samples(np.array(idx)), torch.stack(tuple([self.returns[i] for i in idx])), torch.stack(tuple([self.advantages[i] for i in idx]))
-        
+            if self.R_adv_attr:
+                return self._get_samples(np.array(idx)), torch.stack(tuple([self.returns[i] for i in idx])), torch.stack(tuple([self.advantages[i] for i in idx]))
+            else:
+                return self._get_samples(idx), None, None        
     def get_sample(self, batch_size = None, start_idx = None, shuffle = False):
 
         if batch_size is None:
@@ -170,6 +176,8 @@ class ReplayBuffer():
                 self.advantages = [tensor.cuda() for tensor in self.advantages]
                 # torch.tensor(self.returns, device='cuda')
             a = 1
+        self.R_adv_attr = True
+        
 
 
 

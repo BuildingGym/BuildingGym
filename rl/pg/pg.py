@@ -147,11 +147,15 @@ class pg(OnPolicyAlgorithm):
         if _init_setup_model:
             self._setup_model()
 
-    def train(self, obs, actions, returns) -> None:
+    def train(self, buffer) -> None:
         """
         Update policy using the currently gathered
         rollout buffer (one gradient step over whole data).
         """
+        train_input, _, _ = buffer.get(self.args.batch_size)
+        obs = train_input[0]
+        actions = train_input[1]
+        returns = train_input[4]
         # Switch to train mode (this affects batch norm / dropout)
         self.policy.set_training_mode(True)
         # self.policy.action_network.train()
@@ -166,7 +170,7 @@ class pg(OnPolicyAlgorithm):
             # if n_train >= max_train_perEp:
             #     break
         # rollout_data = self.rollout_buffer.get(batch_size=self.batch_size, shuffle=self.args.shuffle)
-        actions = actions
+        # actions = actions
         if isinstance(self.action_space, spaces.Discrete):
             # Convert discrete action from float to long
             actions = actions.long().flatten()
@@ -226,7 +230,7 @@ class pg(OnPolicyAlgorithm):
         # return policy_loss.item(), np.mean(self.rollout_buffer.logprobs[106])
         # self.my_callback.per_time_step(locals())
 
-        return policy_loss.mean().item()
+        return policy_loss.mean().item(), 0
 
 
     def learn(

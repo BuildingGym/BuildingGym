@@ -328,14 +328,18 @@ class buildinggym_env():
                         action_i = self.actions[i]
                         R_i = self.cal_return(self.rewards[i+1:i+b])
                         if self.batch_n< self.args.batch_size*self.args.n_steps:
-                            self.buffer.add([ob_i, action_i, logp_i, r_i, value])   # List['obs', 'action', 'logprb', 'rewards', 'values']
+                            if value is not None:
+                                self.buffer.add([ob_i, action_i, logp_i, r_i, value])   # List['obs', 'action', 'logprb', 'rewards', 'values']
+                            else:
+                                self.buffer.add([ob_i, action_i, logp_i, r_i, R_i])   # List['obs', 'action', 'logprb', 'rewards', 'values']
                             # self.obs_batch[self.batch_n, :] = ob_i
                             # self.return_batch[self.batch_n, :] = R_i
                             # self.action_batch[self.batch_n, :] = action_i
                             self.batch_n+=1
                         else:
                             self.batch_n=0
-                            self.buffer.cal_R_adv(self.args.batch_size)
+                            if value is not None:
+                                self.buffer.cal_R_adv(self.args.batch_size)
                             p_loss_i, v_loss_i = self.algo.train(self.buffer)
                             self.buffer.reset()  # dxl: can update to be able to store somme history info
                             self.p_loss_list.append(p_loss_i)
