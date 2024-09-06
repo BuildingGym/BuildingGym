@@ -231,12 +231,13 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             # # _values = self.values_wt
             # _log_probs = self.logprobs_wt 
             performance = np.mean(env.sensor_dic['rewards'][np.where(env.sensor_dic['Working time'])[0]])
-            if performance > 0.2:
+            if performance > -1 and performance>self.env.best_performance:
+                self.env.best_performance = performance
                 path_i = os.path.join('Archive results', self.run_name)
                 if not os.path.exists(path_i):
                     os.mkdir(path_i) 
-                env.sensor_dic.to_csv(os.path.join(path_i, 'results.csv'))
-                torch.save(self.policy.state_dict(), os.path.join(path_i, 'model.pth'))
+                env.sensor_dic.to_csv(os.path.join(path_i, str(round(performance, 2))+'-results.csv'))
+                torch.save(self.policy.state_dict(), os.path.join(path_i, str(round(performance, 2))+'-model.pth'))
         #     training_data = [_obs, _actions, _rewards, _log_probs]
         #     # index = random.randint(0, _obs.shape[0]-self.batch_size-1)
 

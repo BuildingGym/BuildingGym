@@ -65,6 +65,7 @@ class buildinggym_env():
                  observation_dim,
                  action_type,
                  args,
+                 ext_obs_bool = False,
                  agent = None) -> None:
         global thinenv
         self.simulator = Simulator().add(
@@ -77,6 +78,7 @@ class buildinggym_env():
             )
         self.idf_file = idf_file
         self.epw_file = epw_file
+        self.ext_obs_bool = ext_obs_bool
         self.simulator.add(
             thinenv := ThinEnv(
                 action_space=action_space,    
@@ -91,7 +93,8 @@ class buildinggym_env():
         if isinstance(action_type, Discrete):
             self.action_space = Discrete(action_type.n)
         
-        self.observation_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
+        self.inter_obs_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
+        self.ext_obs_var = ['signal']
         self.action_var = ['Thermostat']
         self.num_envs = 1
         self.agent = agent
@@ -108,6 +111,7 @@ class buildinggym_env():
         self.simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
         self.baseline = pd.read_csv('Data\\Day_mean.csv')
         self.com = 25
+        self.best_performance = 0
         # self.baseline['Time'] = pd.to_datetime(self.baseline['Time'], format='%m/%d/%Y %H:%M')
 
     def setup(self, algo):
@@ -121,58 +125,62 @@ class buildinggym_env():
         #     self.agent = agent
         asyncio.run(energyplus_running(self.simulator, self.idf_file, self.epw_file))
 
-    def normalize_input(self, data=None):
-        nor_min = np.array([22.8, 22, 0, 0, 0])
-        nor_mean = np.array([28.7, 26, 0.77, 0.57, 0.9])
-        # nor_min = np.array([0, 0, 0, 0, 0])
-        nor_max = np.array([33.3, 27, 1, 1, 1])
-        std = np.array([2, 0.5, 0.4, 0.26, 0.26])
-        # nor_max = np.array([1, 1, 1, 1, 1])
-        if data == None:
-            data = self.sensor_dic[self.observation_var]
-        # nor_input = (data - nor_min)/(nor_max - nor_min)
-        nor_input = (data - nor_mean)/std
-        # nor_input = (data - np.array([27, 25, 0.5, 0.5, 0.5]))/np.array([3, 1, 0.2, 0.2, 0.2])
-        j = 0
-        for i in self.observation_var:
-            col_i =  i + "_nor"
-            self.sensor_dic[col_i] = nor_input.iloc[:, j]
-            j+=1
+    # def normalize_input(self, data=None):
+    #     nor_min = np.array([22.8, 22, 0, 0, 0])
+    #     nor_mean = np.array([28.7, 26, 0.77, 0.57, 0.9])
+    #     # nor_min = np.array([0, 0, 0, 0, 0])
+    #     nor_max = np.array([33.3, 27, 1, 1, 1])
+    #     std = np.array([2, 0.5, 0.4, 0.26, 0.26])
+    #     # nor_max = np.array([1, 1, 1, 1, 1])
+    #     if data == None:
+    #         data = self.sensor_dic[self.inter_obs_var]
+    #     # nor_input = (data - nor_min)/(nor_max - nor_min)
+    #     nor_input = (data - nor_mean)/std
+    #     # nor_input = (data - np.array([27, 25, 0.5, 0.5, 0.5]))/np.array([3, 1, 0.2, 0.2, 0.2])
+    #     j = 0
+    #     for i in self.inter_obs_var:
+    #         col_i =  i + "_nor"
+    #         self.sensor_dic[col_i] = nor_input.iloc[:, j]
+    #         j+=1
 
     def normalize_input_i(self, state):
-        nor_min = np.array([22.8, 22, 0, 0, 0])
-        nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89])
-        std = np.array([2.17, 0.5, 0.39, 0.26, 0.26])
+        # nor_min = np.array([22.8, 22, 0, 0, 0])
+        nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89, 0])
+        # nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89])
+        std = np.array([2.17, 0.5, 0.39, 0.26, 0.26, 1])
+        # std = np.array([2.17, 0.5, 0.39, 0.26, 0.26])
+
+
         # nor_min = np.array([0, 0, 0, 0, 0])
-        nor_max = np.array([33.3, 27, 1, 1, 1])
+        # nor_max = np.array([33.3, 27, 1, 1, 1])
         # nor_max = np.array([1, 1, 1, 1, 1])
         return (state- nor_mean)/std
-        return (state- nor_min)/(nor_max - nor_min)
+        # return (state- nor_min)/(nor_max - nor_min)
         # return (state - np.array([27, 25, 0.5, 0.5, 0.5]))/np.array([3, 1, 0.2, 0.2, 0.2])
     
-    def label_working_time(self):
-        start = pd.to_datetime(self.args.work_time_start, format='%H:%M')
-        end = pd.to_datetime(self.args.work_time_end, format='%H:%M')
-        # remove data without enough outlook step
-        dt = int(60/self.args.n_time_step)
-        dt = pd.to_timedelta(dt, unit='min')
-        # end -= dt
-        wt = [] # wt: working time label
-        terminations = [] # terminations: end of working time
-        for i in range(int(self.sensor_dic.shape[0])):
-            h = self.sensor_dic['Time'].iloc[i].hour
-            m = self.sensor_dic['Time'].iloc[i].minute
-            t = pd.to_datetime(str(h)+':'+str(m), format='%H:%M')
-            if t >= start and t < end:
-                wt.append(True)
-            else:
-                wt.append(False)
-            if t >= end - dt:
-                terminations.append(True)
-            else:
-                terminations.append(False)
-        self.sensor_dic['Working_time'] = wt
-        self.sensor_dic['Terminations'] = terminations    
+    # def label_working_time(self):
+    #     start = pd.to_datetime(self.args.work_time_start, format='%H:%M')
+    #     end = pd.to_datetime(self.args.work_time_end, format='%H:%M')
+    #     # remove data without enough outlook step
+    #     dt = int(60/self.args.n_time_step)
+    #     dt = pd.to_timedelta(dt, unit='min')
+    #     # end -= dt
+    #     wt = [] # wt: working time label
+    #     terminations = [] # terminations: end of working time
+    #     for i in range(int(self.sensor_dic.shape[0])):
+    #         h = self.sensor_dic['Time'].iloc[i].hour
+    #         m = self.sensor_dic['Time'].iloc[i].minute
+    #         t = pd.to_datetime(str(h)+':'+str(m), format='%H:%M')
+    #         if t >= start and t < end:
+    #             wt.append(True)
+    #         else:
+    #             wt.append(False)
+    #         if t >= end - dt:
+    #             terminations.append(True)
+    #         else:
+    #             terminations.append(False)
+    #     self.sensor_dic['Working_time'] = wt
+    #     self.sensor_dic['Terminations'] = terminations    
 
     def label_working_time_i(self, t):
         start = pd.to_datetime(self.args.work_time_start, format='%H:%M')
@@ -196,34 +204,34 @@ class buildinggym_env():
         return wt
         # self.sensor_dic['Terminations'] = terminations            
 
-    def cal_r(self):
-        baseline = pd.read_csv('Data\Day_mean.csv')
-        reward = []
-        result = []
-        # Realtime reward function
-        for j in range(self.sensor_dic.shape[0]):
-            energy_i = self.sensor_dic['Chiller Electricity Rate'].iloc[j]
-            k = j % (24*self.args.n_time_step)
-            baseline_i = baseline['Day_mean'].iloc[k]
-            reward_i = max(round(0.3 - abs(energy_i ** 2 - baseline_i ** 2)/baseline_i ** 2,2),-0.4)*5
-            result_i = round(1 - abs(energy_i - baseline_i)/baseline_i,2)
-            # reward_i = result_i
-            # if reward_i<0.8:
-            #     reward_i = reward_i**2
-            # else:
-            #     reward_i+=reward_i*5
-            reward.append(reward_i)
-            result.append(result_i)          
+    # def cal_r(self):
+    #     baseline = pd.read_csv('Data\Day_mean.csv')
+    #     reward = []
+    #     result = []
+    #     # Realtime reward function
+    #     for j in range(self.sensor_dic.shape[0]):
+    #         energy_i = self.sensor_dic['Chiller Electricity Rate'].iloc[j]
+    #         k = j % (24*self.args.n_time_step)
+    #         baseline_i = baseline['Day_mean'].iloc[k]
+    #         reward_i = max(round(0.3 - abs(energy_i ** 2 - baseline_i ** 2)/baseline_i ** 2,2),-0.4)*5
+    #         result_i = round(1 - abs(energy_i - baseline_i)/baseline_i,2)
+    #         # reward_i = result_i
+    #         # if reward_i<0.8:
+    #         #     reward_i = reward_i**2
+    #         # else:
+    #         #     reward_i+=reward_i*5
+    #         reward.append(reward_i)
+    #         result.append(result_i)          
         
-        reward = reward[1:]
-        result = result[1:]
-        self.actions = self.actions[0:-1]
-        self.logprobs = self.logprobs[0:-1]
-        self.sensor_dic =  self.sensor_dic[0:-1]
-        self.sensor_dic['rewards'] = reward
-        self.sensor_dic['results'] = result
+    #     reward = reward[1:]
+    #     result = result[1:]
+    #     self.actions = self.actions[0:-1]
+    #     self.logprobs = self.logprobs[0:-1]
+    #     self.sensor_dic =  self.sensor_dic[0:-1]
+    #     self.sensor_dic['rewards'] = reward
+    #     self.sensor_dic['results'] = result
 
-    def cal_r_i(self, data, time):
+    def cal_r_i(self, data, time, signal):
         # baseline = pd.read_csv('Data\Day_mean.csv')
         hour = time.hour
         min = time.minute
@@ -237,7 +245,7 @@ class buildinggym_env():
         actual_reduction = (baseline_i - data) / baseline_i
         
         # Target reduction percentage
-        target_reduction = 0.15
+        target_reduction = 0.3 * signal
         
         # if abs(actual_reduction-target_reduction) < 0.05:
         #     energy_reward = 5
@@ -256,9 +264,32 @@ class buildinggym_env():
         for r in reward_list[::-1]:
             R = r + R * self.args.gamma
         return R
+    
+    def get_ext_var(self, t=None):
+        ext_obs_var = {}
+        if t.hour >=12 and t.hour<=14:
+            for i in self.ext_obs_var:
+                ext_obs_var[i] = random.choice([0.5, 1])
+        elif t.hour >=16 and t.hour<=18:
+            for i in self.ext_obs_var:
+                ext_obs_var[i] = random.choice([0.5, 1])     
+        else:
+            for i in self.ext_obs_var:
+                ext_obs_var[i] = random.choice([0])                        
+        return ext_obs_var
 
     def handler(self, __event):
         global thinenv
+
+        # from energyplus.ooep import TemporaryUnavailableError
+        # try:
+        #     print(self.simulator.variables.getdefault(
+        #         ooep.WallClock.Ref()
+        #     ).value)
+        #     a = 1
+        # except TemporaryUnavailableError:
+        #     pass
+
         try:
             obs = thinenv.observe()
             t = self.simulator.variables.getdefault(
@@ -269,9 +300,19 @@ class buildinggym_env():
             warm_up = True
 
         if not warm_up:
-            state = [float(obs[i]) for i in self.observation_var]
+            state = [float(obs[i]) for i in self.inter_obs_var]
+            if self.ext_obs_bool:
+                if t.hour == 0 or t.hour>self.t_index:
+                    self.ext_obs_var = self.get_ext_var(t)
+                    self.t_index = t.hour
+                for _, value in self.ext_obs_var.items():
+                    state.append(value)
             cooling_energy =  obs['Energy_1'].item() + obs['Energy_2'].item() + obs['Energy_3'].item() + obs['Energy_4'].item() + obs['Energy_5'].item()
             state = self.normalize_input_i(state)
+            if self.ext_obs_bool:
+                signal = state[-1]
+            else:
+                signal = 0.5
             state = torch.Tensor(state).cuda() if torch.cuda.is_available() and self.args.cuda else torch.Tensor(state).cpu()
             with torch.no_grad():
                 actions, value, logprob = self.agent(state)
@@ -284,11 +325,13 @@ class buildinggym_env():
             obs.insert(0, 'day_of_week', t.weekday())
             obs.insert(1, 'Working time', self.label_working_time_i(t))            
             obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', self.com)
-            reward_i, result_i, baseline_i = self.cal_r_i(cooling_energy, t)
+            reward_i, result_i, baseline_i = self.cal_r_i(cooling_energy, t, signal)
             obs['cooling_energy'] = cooling_energy
             obs['results'] = result_i
             obs['rewards'] = reward_i
             obs['baseline'] = baseline_i
+            obs['Signal'] = signal
+            obs['Target'] = 20000 * (1-0.3*signal)
             obs.insert(obs.columns.get_loc("t_in") + 1, 'actions', actions.cpu().item())
             obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().item())
             if value is not None:

@@ -135,7 +135,7 @@ class pg(OnPolicyAlgorithm):
         )
 
         self.normalize_advantage = normalize_advantage
-        self.observation_var = env.observation_var
+        # self.observation_var = env.observation_var
         # self.max_train_perEp = max_train_perEp
         self.run_name = run_name
         # Update optimizer inside the policy if we want to use RMSProp

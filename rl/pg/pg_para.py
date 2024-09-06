@@ -46,7 +46,7 @@ class Args:
     sde_sample_freq: int = -1
     # train_perEp: int = 1
     pol_coef: float = 1
-    total_epoch: int = 30
+    total_epoch: int = 300
     max_train_perEp: int = 1
     xa_init_gain: float = 1.
     optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam

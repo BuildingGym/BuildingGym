@@ -135,7 +135,7 @@ class A2C(OnPolicyAlgorithm):
         self.run_name = run_name
 
         self.normalize_advantage = normalize_advantage
-        self.observation_var = env.observation_var
+        # self.observation_var = env.observation_var
         # self.max_train_perEp = max_train_perEp
 
         # Update optimizer inside the policy if we want to use RMSProp
