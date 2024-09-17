@@ -1,5 +1,4 @@
-# from env.env_new_r import buildinggym_env
-from env.env_dqn import buildinggym_env
+from env.env_offline import buildinggym_env
 import gymnasium as _gymnasium_
 from energyplus.ooep.addons.rl import (
     VariableBox,

@@ -14,14 +14,16 @@ class mycallback(BaseCallback):
         reward = np.mean(self.model.env.sensor_dic['rewards'].iloc[np.where(self.model.env.sensor_dic['Working time'])[0]])
         # prob = np.mean(np.exp(self.model.env.sensor_dic['logprobs'].iloc[np.where(self.model.env.sensor_dic['Working time'])[0]]))
         p_loss = np.mean(self.model.env.p_loss_list)
-        v_loss =  np.mean(self.model.env.v_loss_list)
+        if len(self.model.env.v_loss_list)>0:
+            v_loss =  np.mean(self.model.env.v_loss_list)
         # prob = self.model.env.prob
         lr = self.model.learning_rate
         wandb.log({'reward_curve': reward}, step=self.num_timesteps)        
         wandb.log({'result_curve': result}, step=self.num_timesteps)
         # wandb.log({'action prob': prob}, step=self.num_timesteps)
         wandb.log({'p_loss_curve': float(p_loss)}, step=self.num_timesteps)
-        wandb.log({'v_loss_curve': float(v_loss)}, step=self.num_timesteps)
+        if len(self.model.env.v_loss_list)>0:
+            wandb.log({'v_loss_curve': float(v_loss)}, step=self.num_timesteps)
 
     def on_epoch_end(self):
         result = np.mean(self.model.env.sensor_dic['results'].iloc[np.where(self.model.env.sensor_dic['Working time'])[0]])

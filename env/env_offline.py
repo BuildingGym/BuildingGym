@@ -1,11 +1,12 @@
 from energyplus.ooep.addons.progress import ProgressProvider
 import asyncio
 import pandas as pd
-from rl.ppo.network import Agent
+# from rl.ppo.network import Agent
 import random
 import numpy as np
 import time
 from energyplus import ooep
+# import rl
 import torch.nn.functional as F
 import os
 import wandb
@@ -322,9 +323,15 @@ class buildinggym_env():
                 # actions = torch.argmax(q_values, dim=0).cpu().item()
             if random.random() < self.epsilon:
             # if random.random() < 1.1:
-                actions = torch.FloatTensor(actions.shape).uniform_(-1, 1).to(device=self.args.device, dtype=actions.dtype)
+                if type(self.algo).__name__ == 'DQN':
+                    actions = torch.FloatTensor(actions.shape).random_(0, 3).to(device=self.args.device, dtype=actions.dtype)
+                else:
+                    actions = torch.FloatTensor(actions.shape).uniform_(-1, 1).to(device=self.args.device, dtype=actions.dtype)
                 # actions = torch.rand(actions.shape, device=self.args.device, dtype = actions.dtype)
-            self.com +=  actions.cpu().item() * 0.5
+            if type(self.algo).__name__ == 'DQN':
+                self.com +=  (actions.cpu().item() - 1) * 0.5
+            else:
+                self.com +=  actions.cpu().item() * 0.5
             self.com = max(min(self.com, 27), 23)
             # self.com = 27
             obs = pd.DataFrame(obs, index = [self.sensor_index])                
@@ -395,9 +402,13 @@ class buildinggym_env():
 
 
                 if i % self.args.train_frequency == 0 and self.buffer.buffer_size>self.args.batch_size and self.train:
-                    self.actor_losses_i, self.critic_losses_i = self.algo.train()
+                    if type(self.algo).__name__ == 'DQN':
+                        self.actor_losses_i, _ = self.algo.train()
+                    else:
+                        self.actor_losses_i, self.critic_losses_i = self.algo.train()
                     if not math.isnan(self.actor_losses_i):
                         self.p_loss_list.append(self.actor_losses_i)
-                    self.v_loss_list.append(self.critic_losses_i)                    
+                    if not type(self.algo).__name__ == 'DQN':
+                        self.v_loss_list.append(self.critic_losses_i)                    
 
             self.sensor_index+=1

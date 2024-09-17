@@ -14,7 +14,7 @@ class Args:
     # """if toggled, cuda will be enabled by default"""
     # track: bool = True
     # """if toggled, this experiment will be tracked with Weights and Biases"""
-    wandb_project_name: str = "energygym-dqn"
+    wandb_project_name: str = "energygym-dqn-paper-finetune"
     """the wandb's project name"""
     wandb_entity: str = 'buildinggym'
     """the entity (team) of wandb's project"""
@@ -100,9 +100,9 @@ class Args:
     # clip_range_vf: Union[float, None] = None
     # normalize_advantage: bool = True
     tau: float = 0.005
-    target_policy_noise: float = 0.2
-    noise_std: float = 0.2
-    target_noise_clip: float = 5
+    # target_policy_noise: float = 0.2
+    # noise_std: float = 0.2
+    # target_noise_clip: float = 5
     policy_delay: int = 2
     gamma: float = 0.9
     max_buffer_size: int = 2000

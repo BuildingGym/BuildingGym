@@ -176,8 +176,8 @@ class DQN(OffPolicyAlgorithm):
         # self.target_kl = target_kl
 
         self.policy_delay = args.policy_delay
-        self.target_noise_clip = args.target_noise_clip
-        self.target_policy_noise = args.target_policy_noise
+        # self.target_noise_clip = args.target_noise_clip
+        # self.target_policy_noise = args.target_policy_noise
 
         if _init_setup_model:
             self._setup_model()
