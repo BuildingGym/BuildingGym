@@ -571,8 +571,12 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         callback.on_rollout_start()
         env.run(epsilon=self.epsilon, train = train)
         self._update_epsilon()
-        self._update_learning_rate(self.policy.actor.optimizer, self.args.alpha)          
-        self._update_learning_rate(self.policy.critic.optimizer, self.args.alpha)        
+        if 'actor' in self.policy.__dict__:
+            self._update_learning_rate(self.policy.actor.optimizer, self.args.alpha)          
+            self._update_learning_rate(self.policy.critic.optimizer, self.args.alpha)        
+        if 'q_network' in self.policy.__dict__:
+            self._update_learning_rate(self.policy.q_network.optimizer, self.args.alpha)          
+
         # continue_training = True
         # while should_collect_more_steps(train_freq, num_collected_steps, num_collected_episodes):
         #     if self.use_sde and self.sde_sample_freq > 0 and num_collected_steps % self.sde_sample_freq == 0:
