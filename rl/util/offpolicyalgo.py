@@ -587,7 +587,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
 
         self.num_timesteps += env.num_envs
         performance = np.mean(env.sensor_dic['rewards'][np.where(env.sensor_dic['Working time'])[0]])
-        if performance > 0 and performance>self.env.best_performance:
+        if performance > 8.8 and performance>self.env.best_performance:
             self.env.best_performance = performance
             path_i = os.path.join('Archive results', self.run_name)
             if not os.path.exists(path_i):

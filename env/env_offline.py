@@ -162,8 +162,8 @@ class buildinggym_env():
 
     def normalize_input_i(self, state):
         nor_min = np.array([22.8, 22, 0, 0, 0])
-        nor_mean = np.array([29.3, 25, 0.78, 0.58, 0.89, 0])
-        std = np.array([2, 2, 0.39, 0.26, 0.26, 1])
+        nor_mean = np.array([29.3, 25, 0.78, 0.58, 0.89])
+        std = np.array([2, 2, 0.39, 0.26, 0.26])
         # nor_min = np.array([0, 0, 0, 0, 0])
         nor_max = np.array([33.3, 27, 1, 1, 1])
         # nor_max = np.array([1, 1, 1, 1, 1])
@@ -315,7 +315,7 @@ class buildinggym_env():
             if self.ext_obs_bool:
                 signal = state[-1]
             else:
-                signal
+                signal = 0.5
             state = torch.Tensor(state).cuda() if torch.cuda.is_available() and self.args.device == 'cuda'  else torch.Tensor(state).cpu()
             with torch.no_grad():
                 actions = self.agent(state)

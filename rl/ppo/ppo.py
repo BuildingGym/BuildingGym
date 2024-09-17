@@ -92,7 +92,7 @@ class PPO(OnPolicyAlgorithm):
         learning_rate: Union[float, Schedule] = 3e-4,
         n_steps: int = 2048,
         batch_size: int = 64,
-        n_epochs: int = 10,
+        # n_epochs: int = 10,
         gamma: float = 0.99,
         # gae_lambda: float = 0.95,
         clip_range: Union[float, Schedule] = 0.2,
@@ -177,7 +177,7 @@ class PPO(OnPolicyAlgorithm):
                     f"Info: (n_steps={self.args.n_steps} and n_envs={self.env.num_envs})"
                 )
         self.batch_size = batch_size
-        self.n_epochs = n_epochs
+        # self.n_epochs = n_epochs
         # self.n_steps=n_steps
         self.clip_range = clip_range
         self.clip_range_vf = clip_range_vf
