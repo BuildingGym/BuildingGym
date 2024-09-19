@@ -69,9 +69,9 @@ class Args:
     """the maximum norm for the gradient clipping"""
     target_kl: float = None
     """the target KL divergence threshold"""
-    work_time_start: str = '6:00'
+    work_time_start: str = '8:00'
     """the begining of working time"""
-    work_time_end: str = '22:00'
+    work_time_end: str = '19:00'
     """the end of working time"""        
     n_time_step: int = 6
     """the number of steps in one hour"""

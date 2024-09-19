@@ -22,9 +22,9 @@ class Args:
     """the entity (team) of wandb's project"""
 
 
-    work_time_start: str = '6:00'
+    work_time_start: str = '8:00'
     """the begining of working time"""
-    work_time_end: str = '22:00'
+    work_time_end: str = '19:00'
     """the end of working time"""   
     n_time_step: int = 6
     """the number of steps in one hour"""    
