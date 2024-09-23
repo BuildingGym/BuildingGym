@@ -41,6 +41,19 @@ from energyplus.ooep.addons.rl.gymnasium import ThinEnv
 import torch.nn as nn
 import wandb
 from rl.util.replaybuffer import ReplayBuffer
+from controllables.core.tools.gymnasium import (
+    DictSpace,
+    BoxSpace,
+    Agent,
+)
+from controllables.energyplus import (
+    World,
+    #WeatherModel,
+    #Report,
+    Actuator,
+    OutputVariable,
+)
+from controllables.energyplus.events import Event
 
 async def energyplus_running(simulator, idf_file, epw_file):
     await simulator.awaitable.run(
@@ -130,6 +143,243 @@ class buildinggym_env():
         self.best_performance = 0
         # self.baseline['Time'] = pd.to_datetime(self.baseline['Time'], format='%m/%d/%Y %H:%M')
 
+        self.world = world = World(
+            input=World.Specs.Input(
+                world='Small office-1A-Long.idf',
+                #world='tmp_timestep 10 min.idf',
+                weather='USA_FL_Miami.722020_TMY2.epw',
+            ),
+            output=World.Specs.Output(
+                report='tmp/ooep-report-9e1287d2-8e75-4cf5-bbc5-f76580b56a69',
+            ),
+            runtime=World.Specs.Runtime(
+                recurring=False,
+                # design_day=False,
+            ),
+        ).add('logging:progress')
+        self.env = Agent(dict(
+                action_space=DictSpace({
+                    'Thermostat': BoxSpace(
+                        low=22., high=30.,
+                        dtype=_numpy_.float32,
+                        shape=(),
+                    ).bind(world[Actuator.Ref(
+                        type='Schedule:Compact',
+                        control_type='Schedule Value',
+                        key='Always 26',
+                    )])
+                }),    
+                observation_space=DictSpace({
+                    't_in': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Zone Mean Air Temperature',
+                                key='Perimeter_ZN_1 ZN',
+                            )]),
+                    't_out': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Site Outdoor Air Drybulb Temperature',
+                                key='Environment',
+                            )]),
+                    'occ': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Schedule Value',
+                                key='Small Office Bldg Occ',
+                            )]),
+                    'light': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Schedule Value',
+                                key='Office Bldg Light',
+                            )]),
+                    'Equip': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Schedule Value',
+                                key='Small Office Bldg Equip',
+                            )]),
+                    'Energy_1': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Cooling Coil Total Cooling Rate',
+                                key='CORE_ZN ZN PSZ-AC-1 1SPD DX AC CLG COIL 34KBTU/HR 9.7SEER',
+                            )]),
+                    'Energy_2': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Cooling Coil Total Cooling Rate',
+                                key='PERIMETER_ZN_1 ZN PSZ-AC-2 1SPD DX AC CLG COIL 33KBTU/HR 9.7SEER',
+                            )]),
+                    'Energy_3': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Cooling Coil Total Cooling Rate',
+                                key='PERIMETER_ZN_2 ZN PSZ-AC-3 1SPD DX AC CLG COIL 23KBTU/HR 9.7SEER',
+                            )]),
+                    'Energy_4': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Cooling Coil Total Cooling Rate',
+                                key='PERIMETER_ZN_3 ZN PSZ-AC-4 1SPD DX AC CLG COIL 33KBTU/HR 9.7SEER',
+                            )]),
+                    'Energy_5': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Cooling Coil Total Cooling Rate',
+                                key='PERIMETER_ZN_4 ZN PSZ-AC-5 1SPD DX AC CLG COIL 25KBTU/HR 9.7SEER',
+                            )]),                                                                                                                                                                                                                                                                                                                       
+                }),
+            ))        
+
+
+        @self.world.on(Event.Ref('end_zone_timestep_after_zone_reporting', include_warmup=False))
+        def _(_):
+            global thinenv
+            try:
+                t = self.world['wallclock:calendar'].value
+                obs = self.env.observe()
+                # t = self.simulator.variables.getdefault(
+                #     ooep.WallClock.Ref()
+                # ).value
+                warm_up = False
+            except:
+                warm_up = True
+
+            if not warm_up:
+                state = [float(obs[i]) for i in self.inter_obs_var]
+                if self.ext_obs_bool:
+                    if t.hour == 0 or t.hour>self.t_index:
+                        self.ext_obs_var = self.get_ext_var(t)
+                        self.t_index = t.hour
+                    for _, value in self.ext_obs_var.items():
+                        state.append(value)
+                cooling_energy =  obs['Energy_1'].item() + obs['Energy_2'].item() + obs['Energy_3'].item() + obs['Energy_4'].item() + obs['Energy_5'].item()
+                state = self.normalize_input_i(state)
+                if self.ext_obs_bool:
+                    signal = state[-1]
+                else:
+                    signal = 0.5
+                state = torch.Tensor(state).cuda() if torch.cuda.is_available() and self.args.device == 'cuda'  else torch.Tensor(state).cpu()
+                with torch.no_grad():
+                    actions = self.agent(state)
+                    # actions = torch.argmax(q_values, dim=0).cpu().item()
+                if random.random() < self.epsilon:
+                # if random.random() < 1.1:
+                    if type(self.algo).__name__ == 'DQN':
+                        actions = torch.FloatTensor(actions.shape).random_(0, 3).to(device=self.args.device, dtype=actions.dtype)
+                    else:
+                        actions = torch.FloatTensor(actions.shape).uniform_(-1, 1).to(device=self.args.device, dtype=actions.dtype)
+                    # actions = torch.rand(actions.shape, device=self.args.device, dtype = actions.dtype)
+                if type(self.algo).__name__ == 'DQN':
+                    self.com +=  (actions.cpu().item() - 1) * 0.5
+                else:
+                    self.com +=  actions.cpu().item() * 0.5
+                self.com = max(min(self.com, 27), 23)
+                # self.com = 27
+                obs = pd.DataFrame(obs, index = [self.sensor_index])                
+                obs.insert(0, 'Time', t)
+                obs.insert(0, 'day_of_week', t.weekday())
+                obs.insert(1, 'Working time', self.label_working_time_i(t))            
+                obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', self.com)
+                reward_i, result_i, baseline_i = self.cal_r_i(cooling_energy, t, signal)
+                obs['cooling_energy'] = cooling_energy
+                obs['results'] = result_i
+                obs['rewards'] = reward_i
+                obs['baseline'] = baseline_i
+                obs['Signal'] = signal
+                obs['Target'] = 20000 * (1-0.3*signal)            
+                obs.insert(obs.columns.get_loc("t_in") + 1, 'actions', actions.cpu().item())
+                # obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().item())
+                # obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value.cpu().item())
+
+
+                if self.sensor_index == 0:
+                    self.sensor_dic = pd.DataFrame({})
+                    self.sensor_dic = obs
+                    # self.logprobs = [logprob]
+                    # self.values = [value]
+                    self.actions = [actions]
+                    self.states = [state]
+                    # self.values = [value]
+                    self.rewards = [reward_i]
+                else:
+                    self.sensor_dic = pd.concat([self.sensor_dic, obs])           
+                    # self.logprobs.append(logprob) 
+                    # self.values.append(value) 
+                    self.actions.append(actions)
+                    self.states.append(state)
+                    # self.values.append(value)
+                    self.rewards.append(reward_i)
+                actions = actions.cpu().item()
+                # com = 25. + actions * 2
+                # act = thinenv.act({'Thermostat': self.com})
+                self.env.action.value = {
+                'Thermostat': self.com,
+                }                
+                # act = thinenv.act({'Thermostat': 26.2})
+
+                b  = self.args.outlook_steps + 1
+                # self.buffer.add([self.states[i], self.actions[i], self.logprobs[i], r_i, value])   # List['obs', 'action', 'logprb', 'rewards', 'values']
+
+                if self.sensor_index > b:
+                    i = self.sensor_index-b
+                    if i % self.args.step_size == 0:
+                        if np.sum(self.sensor_dic['Working time'].iloc[i:(self.sensor_index)]) == b:
+                            ob_i = self.states[i]
+                            ob_nxt_i = self.states[i+1]
+                            r_i = self.rewards[i+1]
+                            # logp_i = self.logprobs[i]
+                            action_i = self.actions[i]
+                            R_i = self.cal_return(self.rewards[i+1:i+b])
+                            # if self.batch_n<self.args.batch_size:
+                            self.buffer.add([ob_i, action_i, r_i, ob_nxt_i], max_buffer_size = self.args.max_buffer_size)  # List['obs', 'actions', 'rewards', 'nxt_obs']
+                                # self.obs_batch[self.batch_n, :] = ob_i
+                                # self.return_batch[self.batch_n, :] = R_i
+                                # self.action_batch[self.batch_n, :] = action_i
+                            #     self.batch_n+=1
+                            # else:
+                            #     self.batch_n=0
+                            #     self.buffer.cal_R_adv()
+                            #     p_loss_i, v_loss_i = self.algo.train(self.buffer)
+                            #     self.buffer.reset()  # dxl: can update to be able to store somme history info
+                            #     self.p_loss_list.append(p_loss_i)
+                            #     self.v_loss_list.append(v_loss_i)
+
+
+                    if i % self.args.train_frequency == 0 and self.buffer.buffer_size>self.args.batch_size and self.train:
+                        if type(self.algo).__name__ == 'DQN':
+                            self.actor_losses_i, _ = self.algo.train()
+                        else:
+                            self.actor_losses_i, self.critic_losses_i = self.algo.train()
+                        if not math.isnan(self.actor_losses_i):
+                            self.p_loss_list.append(self.actor_losses_i)
+                        if not type(self.algo).__name__ == 'DQN':
+                            self.v_loss_list.append(self.critic_losses_i)                    
+
+                self.sensor_index+=1        
+
     def setup(self, algo):
         self.algo = algo
         self.agent = self.algo.policy
@@ -141,60 +391,22 @@ class buildinggym_env():
         self.sensor_index = 0
         # if agent is not None:
         #     self.agent = agent
-        asyncio.run(energyplus_running(self.simulator, self.idf_file, self.epw_file))
+        # asyncio.run(energyplus_running(self.simulator, self.idf_file, self.epw_file))
+        self.world.run()
 
-    # def normalize_input(self, data=None):
-    #     nor_min = np.array([22.8, 22, 0, 0, 0])
-    #     nor_mean = np.array([28.7, 26, 0.77, 0.57, 0.9, 0])
-    #     # nor_min = np.array([0, 0, 0, 0, 0])
-    #     nor_max = np.array([33.3, 27, 1, 1, 1])
-    #     std = np.array([2, 0.5, 0.4, 0.26, 0.26, 1])
-    #     # nor_max = np.array([1, 1, 1, 1, 1])
-    #     if data == None:
-    #         data = self.sensor_dic[self.observation_var]
-    #     # nor_input = (data - nor_min)/(nor_max - nor_min)
-    #     nor_input = (data - nor_mean)/std
-    #     # nor_input = (data - np.array([27, 25, 0.5, 0.5, 0.5]))/np.array([3, 1, 0.2, 0.2, 0.2])
-    #     j = 0
-    #     for i in self.observation_var:
-    #         col_i =  i + "_nor"
-    #         self.sensor_dic[col_i] = nor_input.iloc[:, j]
-    #         j+=1
+
+
 
     def normalize_input_i(self, state):
         nor_min = np.array([22.8, 22, 0, 0, 0])
         nor_mean = np.array([29.3, 25, 0.78, 0.58, 0.89, 0])
+        nor_mean = np.array([29.3, 25, 0.78, 0.58, 0.89])
         std = np.array([2, 2, 0.39, 0.26, 0.26, 1])
+        std = np.array([2, 2, 0.39, 0.26, 0.26])
         # nor_min = np.array([0, 0, 0, 0, 0])
         nor_max = np.array([33.3, 27, 1, 1, 1])
         # nor_max = np.array([1, 1, 1, 1, 1])
         return (state- nor_mean)/std
-        # return (state- nor_min)/(nor_max - nor_min)
-        # return (state - np.array([27, 25, 0.5, 0.5, 0.5]))/np.array([3, 1, 0.2, 0.2, 0.2])
-    
-    # def label_working_time(self):
-    #     start = pd.to_datetime(self.args.work_time_start, format='%H:%M')
-    #     end = pd.to_datetime(self.args.work_time_end, format='%H:%M')
-    #     # remove data without enough outlook step
-    #     dt = int(60/self.args.n_time_step)
-    #     dt = pd.to_timedelta(dt, unit='min')
-    #     # end -= dt
-    #     wt = [] # wt: working time label
-    #     terminations = [] # terminations: end of working time
-    #     for i in range(int(self.sensor_dic.shape[0])):
-    #         h = self.sensor_dic['Time'].iloc[i].hour
-    #         m = self.sensor_dic['Time'].iloc[i].minute
-    #         t = pd.to_datetime(str(h)+':'+str(m), format='%H:%M')
-    #         if t >= start and t < end:
-    #             wt.append(True)
-    #         else:
-    #             wt.append(False)
-    #         if t >= end - dt:
-    #             terminations.append(True)
-    #         else:
-    #             terminations.append(False)
-    #     self.sensor_dic['Working_time'] = wt
-    #     self.sensor_dic['Terminations'] = terminations    
 
     def label_working_time_i(self, t):
         start = pd.to_datetime(self.args.work_time_start, format='%H:%M')
@@ -373,7 +585,10 @@ class buildinggym_env():
                 self.rewards.append(reward_i)
             actions = actions.cpu().item()
             # com = 25. + actions * 2
-            act = thinenv.act({'Thermostat': self.com})
+            # act = thinenv.act({'Thermostat': self.com})
+            self.env.action.value = {
+                'Thermostat': 27,
+                }            
             # act = thinenv.act({'Thermostat': 26.2})
 
             b  = self.args.outlook_steps + 1
