@@ -17,7 +17,7 @@ for %%a in (%learning_rate%) do (
                         for %%g in (%gamma%) do (
                             for %%h in (%gradient_steps%) do (
                                 for %%i in (%target_policy_noise%) do (
-                                    python test_td3.py --learning_rate %%a --alpha %%b --epsilon_start %%c --batch_size %%d --policy_delay %%e --max_buffer_size %%f --gamma %%g --gradient_steps %%h --target_policy_noise %%i
+                                    python test_td3_ext_var.py --learning_rate %%a --alpha %%b --epsilon_start %%c --batch_size %%d --policy_delay %%e --max_buffer_size %%f --gamma %%g --gradient_steps %%h --target_policy_noise %%i
                                 )
                             )
                         )

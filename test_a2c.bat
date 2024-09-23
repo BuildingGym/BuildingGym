@@ -17,7 +17,7 @@ for %%a in (%learning_rate%) do (
                         for %%g in (%ent_coef%) do (
                             for %%h in (%gae_lambda%) do (
                                 for %%i in (%gamma%) do (
-                                    python test_a2c.py --learning_rate %%a --alpha %%b --outlook_steps %%c --batch_size %%d --vf_coef %%e --pol_coef %%f --ent_coef %%g --gae_lambda %%h --gamma %%i
+                                    python test_a2c_ext_var.py --learning_rate %%a --alpha %%b --outlook_steps %%c --batch_size %%d --vf_coef %%e --pol_coef %%f --ent_coef %%g --gae_lambda %%h --gamma %%i
                                 )
                             )
                         )

@@ -147,11 +147,11 @@ class buildinggym_env():
         # nor_min = np.array([22.8, 22, 0, 0, 0])
 
         nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89, 0])
-        nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89])
+        # nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89])
 
         # nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89])
         std = np.array([2.17, 0.5, 0.39, 0.26, 0.26, 1])
-        std = np.array([2.17, 0.5, 0.39, 0.26, 0.26])
+        # std = np.array([2.17, 0.5, 0.39, 0.26, 0.26])
 
         # std = np.array([2.17, 0.5, 0.39, 0.26, 0.26])
 
@@ -272,12 +272,15 @@ class buildinggym_env():
     
     def get_ext_var(self, t=None):
         ext_obs_var = {}
-        if t.hour >=12 and t.hour<=14:
+        if t.hour >=11 and t.hour<=13:
             for i in self.ext_obs_var:
-                ext_obs_var[i] = random.choice([0.5, 1])
-        elif t.hour >=16 and t.hour<=18:
+                ext_obs_var[i] = random.choice([1])
+        elif t.hour >=14 and t.hour<=16:
             for i in self.ext_obs_var:
-                ext_obs_var[i] = random.choice([0.5, 1])     
+                ext_obs_var[i] = random.choice([0.5])     
+        elif t.hour >=17 and t.hour<=19:
+            for i in self.ext_obs_var:
+                ext_obs_var[i] = random.choice([1])                    
         else:
             for i in self.ext_obs_var:
                 ext_obs_var[i] = random.choice([0])                        

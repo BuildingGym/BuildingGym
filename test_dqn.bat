@@ -17,7 +17,7 @@ for %%a in (%learning_rate%) do (
                         for %%g in (%gamma%) do (
                             for %%h in (%gradient_steps%) do (
                                 for %%i in (%sde_sample_freq%) do (
-                                    python test_dqn.py --learning_rate %%a --alpha %%b --epsilon_start %%c --batch_size %%d --policy_delay %%e --max_buffer_size %%f --gamma %%g --gradient_steps %%h --sde_sample_freq %%i
+                                    python test_dqn_ext_var.py --learning_rate %%a --alpha %%b --epsilon_start %%c --batch_size %%d --policy_delay %%e --max_buffer_size %%f --gamma %%g --gradient_steps %%h --sde_sample_freq %%i
                                 )
                             )
                         )

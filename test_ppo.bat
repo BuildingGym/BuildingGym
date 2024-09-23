@@ -1,7 +1,7 @@
 @echo off
 set learning_rate=1e-3 7e-3 1e-2 5e-4
 set alpha=0.99 0.9 0.8
-set outlook_steps=6 12
+set outlook_steps=6
 set batch_size=6 12 64
 set vf_coef=0.5 0.1 0.9
 set total_epoch=200
@@ -17,7 +17,7 @@ for %%a in (%learning_rate%) do (
                         for %%g in (%ent_coef%) do (
                             for %%h in (%gae_lambda%) do (
                                 for %%i in (%gamma%) do (
-                                    python test_ppo.py --learning_rate %%a --alpha %%b --outlook_steps %%c --batch_size %%d --vf_coef %%e --total_epoch %%f --ent_coef %%g --gae_lambda %%h --gamma %%i
+                                    python test_ppo_ext_var.py --learning_rate %%a --alpha %%b --outlook_steps %%c --batch_size %%d --vf_coef %%e --total_epoch %%f --ent_coef %%g --gae_lambda %%h --gamma %%i
                                 )
                             )
                         )
