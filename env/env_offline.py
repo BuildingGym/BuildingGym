@@ -41,19 +41,26 @@ from energyplus.ooep.addons.rl.gymnasium import ThinEnv
 import torch.nn as nn
 import wandb
 from rl.util.replaybuffer import ReplayBuffer
-from controllables.core.tools.gymnasium import (
-    DictSpace,
-    BoxSpace,
-    Agent,
-)
 from controllables.energyplus import (
-    World,
+    System,
     #WeatherModel,
     #Report,
     Actuator,
     OutputVariable,
 )
+
+# from energyplus.dataset.basic import dataset as _epds_
 from controllables.energyplus.events import Event
+
+
+
+from controllables.core import TemporaryUnavailableError 
+
+from controllables.core.tools.gymnasium import (
+    DictSpace,
+    BoxSpace,
+    Agent,
+)
 
 async def energyplus_running(simulator, idf_file, epw_file):
     await simulator.awaitable.run(
@@ -143,20 +150,32 @@ class buildinggym_env():
         self.best_performance = 0
         # self.baseline['Time'] = pd.to_datetime(self.baseline['Time'], format='%m/%d/%Y %H:%M')
 
-        self.world = world = World(
-            input=World.Specs.Input(
-                world='Small office-1A-Long.idf',
-                #world='tmp_timestep 10 min.idf',
-                weather='USA_FL_Miami.722020_TMY2.epw',
-            ),
-            output=World.Specs.Output(
-                report='tmp/ooep-report-9e1287d2-8e75-4cf5-bbc5-f76580b56a69',
-            ),
-            runtime=World.Specs.Runtime(
-                recurring=False,
-                # design_day=False,
-            ),
+        # self.world = world = World(
+        #     input=World.Specs.Input(
+        #         world='Small office-1A-Long.idf',
+        #         #world='tmp_timestep 10 min.idf',
+        #         weather='USA_FL_Miami.722020_TMY2.epw',
+        #     ),
+        #     output=World.Specs.Output(
+        #         report='tmp/ooep-report-9e1287d2-8e75-4cf5-bbc5-f76580b56a69',
+        #     ),
+        #     runtime=World.Specs.Runtime(
+        #         recurring=False,
+        #         # design_day=False,
+        #     ),
+        # ).add('logging:progress')
+
+        self.world = world = System(
+            building='Small office-1A-Long.idf',
+            #world='tmp_timestep 10 min.idf',
+            weather='USA_FL_Miami.722020_TMY2.epw',
+        
+            report='tmp/ooep-report-9e1287d2-8e75-4cf5-bbc5-f76580b56a69',
+            repeat=False,
+            # design_day=False,
         ).add('logging:progress')
+
+
         self.env = Agent(dict(
                 action_space=DictSpace({
                     'Thermostat': BoxSpace(
@@ -392,7 +411,7 @@ class buildinggym_env():
         # if agent is not None:
         #     self.agent = agent
         # asyncio.run(energyplus_running(self.simulator, self.idf_file, self.epw_file))
-        self.world.run()
+        self.world.start().wait()
 
 
 
