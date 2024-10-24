@@ -104,11 +104,11 @@ class buildinggym_env():
                  args=None,
                  ext_obs_bool = False,
                  agent = None) -> None:
-        global thinenv
-        self.simulator = Simulator().add(
-            ProgressProvider(),
-            #LogProvider(),
-        )
+        # global thinenv
+        # self.simulator = Simulator().add(
+        #     ProgressProvider(),
+        #     #LogProvider(),
+        # )
         self.buffer = ReplayBuffer(
             info=['obs', 'actions', 'rewards', 'nxt_obs'],
             args=args
@@ -116,12 +116,12 @@ class buildinggym_env():
         self.idf_file = idf_file
         self.epw_file = epw_file
         self.ext_obs_bool = ext_obs_bool
-        self.simulator.add(
-            thinenv := ThinEnv(
-                action_space=action_space,    
-                observation_space=observation_space,
-            )
-        )
+        # self.simulator.add(
+        #     thinenv := ThinEnv(
+        #         action_space=action_space,    
+        #         observation_space=observation_space,
+        #     )
+        # )
         # To update:
         self.observation_space = Box(np.array([-np.inf] * observation_dim), np.array([np.inf] * observation_dim))
         
@@ -144,7 +144,7 @@ class buildinggym_env():
         self.obs_batch = torch.zeros(args.batch_size, observation_dim).to('cuda')
         self.action_batch = torch.zeros(args.batch_size, 1).to('cuda')
         self.return_batch = torch.zeros(args.batch_size, 1).to('cuda')
-        self.simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
+        # self.simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
         self.baseline = pd.read_csv('Data\\Day_mean.csv')
         self.com = 24
         self.best_performance = 0
@@ -526,126 +526,126 @@ class buildinggym_env():
                 ext_obs_var[i] = random.choice([0])                        
         return ext_obs_var
 
-    def handler(self, __event):
-        global thinenv
-        try:
-            obs = thinenv.observe()
-            t = self.simulator.variables.getdefault(
-                ooep.WallClock.Ref()
-            ).value
-            warm_up = False
-        except:
-            warm_up = True
+    # def handler(self, __event):
+    #     global thinenv
+    #     try:
+    #         obs = thinenv.observe()
+    #         t = self.simulator.variables.getdefault(
+    #             ooep.WallClock.Ref()
+    #         ).value
+    #         warm_up = False
+    #     except:
+    #         warm_up = True
 
-        if not warm_up:
-            state = [float(obs[i]) for i in self.inter_obs_var]
-            if self.ext_obs_bool:
-                if t.hour == 0 or t.hour>self.t_index:
-                    self.ext_obs_var = self.get_ext_var(t)
-                    self.t_index = t.hour
-                for _, value in self.ext_obs_var.items():
-                    state.append(value)
-            cooling_energy =  obs['Energy_1'].item() + obs['Energy_2'].item() + obs['Energy_3'].item() + obs['Energy_4'].item() + obs['Energy_5'].item()
-            state = self.normalize_input_i(state)
-            if self.ext_obs_bool:
-                signal = state[-1]
-            else:
-                signal = 0.5
-            state = torch.Tensor(state).cuda() if torch.cuda.is_available() and self.args.device == 'cuda'  else torch.Tensor(state).cpu()
-            with torch.no_grad():
-                actions = self.agent(state)
-                # actions = torch.argmax(q_values, dim=0).cpu().item()
-            if random.random() < self.epsilon:
-            # if random.random() < 1.1:
-                if type(self.algo).__name__ == 'DQN':
-                    actions = torch.FloatTensor(actions.shape).random_(0, 3).to(device=self.args.device, dtype=actions.dtype)
-                else:
-                    actions = torch.FloatTensor(actions.shape).uniform_(-1, 1).to(device=self.args.device, dtype=actions.dtype)
-                # actions = torch.rand(actions.shape, device=self.args.device, dtype = actions.dtype)
-            if type(self.algo).__name__ == 'DQN':
-                self.com +=  (actions.cpu().item() - 1) * 0.5
-            else:
-                self.com +=  actions.cpu().item() * 0.5
-            self.com = max(min(self.com, 27), 23)
-            # self.com = 27
-            obs = pd.DataFrame(obs, index = [self.sensor_index])                
-            obs.insert(0, 'Time', t)
-            obs.insert(0, 'day_of_week', t.weekday())
-            obs.insert(1, 'Working time', self.label_working_time_i(t))            
-            obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', self.com)
-            reward_i, result_i, baseline_i = self.cal_r_i(cooling_energy, t, signal)
-            obs['cooling_energy'] = cooling_energy
-            obs['results'] = result_i
-            obs['rewards'] = reward_i
-            obs['baseline'] = baseline_i
-            obs['Signal'] = signal
-            obs['Target'] = 20000 * (1-0.3*signal)            
-            obs.insert(obs.columns.get_loc("t_in") + 1, 'actions', actions.cpu().item())
-            # obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().item())
-            # obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value.cpu().item())
-
-
-            if self.sensor_index == 0:
-                self.sensor_dic = pd.DataFrame({})
-                self.sensor_dic = obs
-                # self.logprobs = [logprob]
-                # self.values = [value]
-                self.actions = [actions]
-                self.states = [state]
-                # self.values = [value]
-                self.rewards = [reward_i]
-            else:
-                self.sensor_dic = pd.concat([self.sensor_dic, obs])           
-                # self.logprobs.append(logprob) 
-                # self.values.append(value) 
-                self.actions.append(actions)
-                self.states.append(state)
-                # self.values.append(value)
-                self.rewards.append(reward_i)
-            actions = actions.cpu().item()
-            # com = 25. + actions * 2
-            # act = thinenv.act({'Thermostat': self.com})
-            self.env.action.value = {
-                'Thermostat': 27,
-                }            
-            # act = thinenv.act({'Thermostat': 26.2})
-
-            b  = self.args.outlook_steps + 1
-            # self.buffer.add([self.states[i], self.actions[i], self.logprobs[i], r_i, value])   # List['obs', 'action', 'logprb', 'rewards', 'values']
-
-            if self.sensor_index > b:
-                i = self.sensor_index-b
-                if i % self.args.step_size == 0:
-                    if np.sum(self.sensor_dic['Working time'].iloc[i:(self.sensor_index)]) == b:
-                        ob_i = self.states[i]
-                        ob_nxt_i = self.states[i+1]
-                        r_i = self.rewards[i+1]
-                        # logp_i = self.logprobs[i]
-                        action_i = self.actions[i]
-                        R_i = self.cal_return(self.rewards[i+1:i+b])
-                        # if self.batch_n<self.args.batch_size:
-                        self.buffer.add([ob_i, action_i, r_i, ob_nxt_i], max_buffer_size = self.args.max_buffer_size)  # List['obs', 'actions', 'rewards', 'nxt_obs']
-                            # self.obs_batch[self.batch_n, :] = ob_i
-                            # self.return_batch[self.batch_n, :] = R_i
-                            # self.action_batch[self.batch_n, :] = action_i
-                        #     self.batch_n+=1
-                        # else:
-                        #     self.batch_n=0
-                        #     self.buffer.cal_R_adv()
-                        #     p_loss_i, v_loss_i = self.algo.train(self.buffer)
-                        #     self.buffer.reset()  # dxl: can update to be able to store somme history info
-                        #     self.p_loss_list.append(p_loss_i)
-                        #     self.v_loss_list.append(v_loss_i)
+    #     if not warm_up:
+    #         state = [float(obs[i]) for i in self.inter_obs_var]
+    #         if self.ext_obs_bool:
+    #             if t.hour == 0 or t.hour>self.t_index:
+    #                 self.ext_obs_var = self.get_ext_var(t)
+    #                 self.t_index = t.hour
+    #             for _, value in self.ext_obs_var.items():
+    #                 state.append(value)
+    #         cooling_energy =  obs['Energy_1'].item() + obs['Energy_2'].item() + obs['Energy_3'].item() + obs['Energy_4'].item() + obs['Energy_5'].item()
+    #         state = self.normalize_input_i(state)
+    #         if self.ext_obs_bool:
+    #             signal = state[-1]
+    #         else:
+    #             signal = 0.5
+    #         state = torch.Tensor(state).cuda() if torch.cuda.is_available() and self.args.device == 'cuda'  else torch.Tensor(state).cpu()
+    #         with torch.no_grad():
+    #             actions = self.agent(state)
+    #             # actions = torch.argmax(q_values, dim=0).cpu().item()
+    #         if random.random() < self.epsilon:
+    #         # if random.random() < 1.1:
+    #             if type(self.algo).__name__ == 'DQN':
+    #                 actions = torch.FloatTensor(actions.shape).random_(0, 3).to(device=self.args.device, dtype=actions.dtype)
+    #             else:
+    #                 actions = torch.FloatTensor(actions.shape).uniform_(-1, 1).to(device=self.args.device, dtype=actions.dtype)
+    #             # actions = torch.rand(actions.shape, device=self.args.device, dtype = actions.dtype)
+    #         if type(self.algo).__name__ == 'DQN':
+    #             self.com +=  (actions.cpu().item() - 1) * 0.5
+    #         else:
+    #             self.com +=  actions.cpu().item() * 0.5
+    #         self.com = max(min(self.com, 27), 23)
+    #         # self.com = 27
+    #         obs = pd.DataFrame(obs, index = [self.sensor_index])                
+    #         obs.insert(0, 'Time', t)
+    #         obs.insert(0, 'day_of_week', t.weekday())
+    #         obs.insert(1, 'Working time', self.label_working_time_i(t))            
+    #         obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', self.com)
+    #         reward_i, result_i, baseline_i = self.cal_r_i(cooling_energy, t, signal)
+    #         obs['cooling_energy'] = cooling_energy
+    #         obs['results'] = result_i
+    #         obs['rewards'] = reward_i
+    #         obs['baseline'] = baseline_i
+    #         obs['Signal'] = signal
+    #         obs['Target'] = 20000 * (1-0.3*signal)            
+    #         obs.insert(obs.columns.get_loc("t_in") + 1, 'actions', actions.cpu().item())
+    #         # obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().item())
+    #         # obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value.cpu().item())
 
 
-                if i % self.args.train_frequency == 0 and self.buffer.buffer_size>self.args.batch_size and self.train:
-                    if type(self.algo).__name__ == 'DQN':
-                        self.actor_losses_i, _ = self.algo.train()
-                    else:
-                        self.actor_losses_i, self.critic_losses_i = self.algo.train()
-                    if not math.isnan(self.actor_losses_i):
-                        self.p_loss_list.append(self.actor_losses_i)
-                    if not type(self.algo).__name__ == 'DQN':
-                        self.v_loss_list.append(self.critic_losses_i)                    
+    #         if self.sensor_index == 0:
+    #             self.sensor_dic = pd.DataFrame({})
+    #             self.sensor_dic = obs
+    #             # self.logprobs = [logprob]
+    #             # self.values = [value]
+    #             self.actions = [actions]
+    #             self.states = [state]
+    #             # self.values = [value]
+    #             self.rewards = [reward_i]
+    #         else:
+    #             self.sensor_dic = pd.concat([self.sensor_dic, obs])           
+    #             # self.logprobs.append(logprob) 
+    #             # self.values.append(value) 
+    #             self.actions.append(actions)
+    #             self.states.append(state)
+    #             # self.values.append(value)
+    #             self.rewards.append(reward_i)
+    #         actions = actions.cpu().item()
+    #         # com = 25. + actions * 2
+    #         # act = thinenv.act({'Thermostat': self.com})
+    #         self.env.action.value = {
+    #             'Thermostat': 27,
+    #             }            
+    #         # act = thinenv.act({'Thermostat': 26.2})
 
-            self.sensor_index+=1
+    #         b  = self.args.outlook_steps + 1
+    #         # self.buffer.add([self.states[i], self.actions[i], self.logprobs[i], r_i, value])   # List['obs', 'action', 'logprb', 'rewards', 'values']
+
+    #         if self.sensor_index > b:
+    #             i = self.sensor_index-b
+    #             if i % self.args.step_size == 0:
+    #                 if np.sum(self.sensor_dic['Working time'].iloc[i:(self.sensor_index)]) == b:
+    #                     ob_i = self.states[i]
+    #                     ob_nxt_i = self.states[i+1]
+    #                     r_i = self.rewards[i+1]
+    #                     # logp_i = self.logprobs[i]
+    #                     action_i = self.actions[i]
+    #                     R_i = self.cal_return(self.rewards[i+1:i+b])
+    #                     # if self.batch_n<self.args.batch_size:
+    #                     self.buffer.add([ob_i, action_i, r_i, ob_nxt_i], max_buffer_size = self.args.max_buffer_size)  # List['obs', 'actions', 'rewards', 'nxt_obs']
+    #                         # self.obs_batch[self.batch_n, :] = ob_i
+    #                         # self.return_batch[self.batch_n, :] = R_i
+    #                         # self.action_batch[self.batch_n, :] = action_i
+    #                     #     self.batch_n+=1
+    #                     # else:
+    #                     #     self.batch_n=0
+    #                     #     self.buffer.cal_R_adv()
+    #                     #     p_loss_i, v_loss_i = self.algo.train(self.buffer)
+    #                     #     self.buffer.reset()  # dxl: can update to be able to store somme history info
+    #                     #     self.p_loss_list.append(p_loss_i)
+    #                     #     self.v_loss_list.append(v_loss_i)
+
+
+    #             if i % self.args.train_frequency == 0 and self.buffer.buffer_size>self.args.batch_size and self.train:
+    #                 if type(self.algo).__name__ == 'DQN':
+    #                     self.actor_losses_i, _ = self.algo.train()
+    #                 else:
+    #                     self.actor_losses_i, self.critic_losses_i = self.algo.train()
+    #                 if not math.isnan(self.actor_losses_i):
+    #                     self.p_loss_list.append(self.actor_losses_i)
+    #                 if not type(self.algo).__name__ == 'DQN':
+    #                     self.v_loss_list.append(self.critic_losses_i)                    
+
+    #         self.sensor_index+=1
