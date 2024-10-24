@@ -62,21 +62,21 @@ from controllables.core.tools.gymnasium import (
     Agent,
 )
 
-async def energyplus_running(simulator, idf_file, epw_file):
-    await simulator.awaitable.run(
-        input=Simulator.InputSpecs(
-            model=(
-                idf_file
-            ),
-            weather=(epw_file),
-        ),
-        output=Simulator.OutputSpecs(
-            #report=('/tmp/ooep-report-9e1287d2-8e75-4cf5-bbc5-f76580b56a69'),
-        ),
-        options=Simulator.RuntimeOptions(
-            #design_day=True,
-        ),
-    ) 
+# async def energyplus_running(simulator, idf_file, epw_file):
+#     await simulator.awaitable.run(
+#         input=Simulator.InputSpecs(
+#             model=(
+#                 idf_file
+#             ),
+#             weather=(epw_file),
+#         ),
+#         output=Simulator.OutputSpecs(
+#             #report=('/tmp/ooep-report-9e1287d2-8e75-4cf5-bbc5-f76580b56a69'),
+#         ),
+#         options=Simulator.RuntimeOptions(
+#             #design_day=True,
+#         ),
+#     ) 
 
 # def energyplus_running(simulator, idf_file, epw_file):
 #     simulator.run(
