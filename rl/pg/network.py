@@ -303,9 +303,9 @@ class Agent(nn.Module):
         self.optimizer = self.optimizer_class(self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)  # type: ignore[call-arg]    
         # self.optimizer =torch.optim.SGD(self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)  # type: ignore[call-arg]    
 
-    def weights_init(self, m):
-        if isinstance(m, nn.Linear):
-            torch.nn.init.normal_(m.weight, mean=self.xa_init_gain, std=0.5)
+    # def weights_init(self, m):
+    #     if isinstance(m, nn.Linear):
+    #         torch.nn.init.normal_(m.weight, mean=self.xa_init_gain, std=0.5)
             # torch.nn.init.zero_(m.bias)
 
     # define init method inside your model class

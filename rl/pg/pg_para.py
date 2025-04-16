@@ -47,7 +47,7 @@ class Args:
     # train_perEp: int = 1
     pol_coef: float = 1
     total_epoch: int = 300
-    max_train_perEp: int = 1
-    xa_init_gain: float = 1.
+    # max_train_perEp: int = 1
+    # xa_init_gain: float = 1.
     optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam
 
