@@ -1,4 +1,4 @@
-# BuildingGym (Paper under review, to be updated soon!!!)
+# BuildingGym
 ![pypi](https://pypi-camo.freetls.fastly.net/49eddcb8b6dd234c39f1459da9dcc601043be0a7/68747470733a2f2f696d672e736869656c64732e696f2f707970692f762f77616e6462) ![License](https://img.shields.io/badge/license-MIT-blue)
 
 <img src="docs\README_images\pytorch_logo.png" width="10%" >  <img src="https://raw.githubusercontent.com/Farama-Foundation/Gymnasium/main/gymnasium-text.png" width="13%" >
