@@ -4,7 +4,7 @@ import torch as th
 
 @dataclass
 class Args:
-    exp_name: str = 'buildinggym-dqn'
+    exp_name: str = 'buildinggym-td3'
     """the name of this experiment"""
     seed: int = None
     """seed of the experiment"""
@@ -14,7 +14,7 @@ class Args:
     # """if toggled, cuda will be enabled by default"""
     # track: bool = True
     # """if toggled, this experiment will be tracked with Weights and Biases"""
-    wandb_project_name: str = "energygym-dqn-paper-finetune"
+    wandb_project_name: str = "energygym-td3-paper-ext_var"
     """the wandb's project name"""
     wandb_entity: str = 'buildinggym'
     """the entity (team) of wandb's project"""
@@ -22,7 +22,7 @@ class Args:
     # """whether to capture videos of the agent performances (check out `videos` folder)"""
 
     # Algorithm specific arguments
-    env_id: str = "EnergyGym-dqn-v1"
+    env_id: str = "EnergyGym-td3-v1"
     """the id of the environment"""
     # total_timesteps: int = 1000
     """total timesteps of the experiments"""
@@ -100,9 +100,9 @@ class Args:
     # clip_range_vf: Union[float, None] = None
     # normalize_advantage: bool = True
     tau: float = 0.005
-    # target_policy_noise: float = 0.2
-    # noise_std: float = 0.2
-    # target_noise_clip: float = 5
+    target_policy_noise: float = 0.2
+    noise_std: float = 0.2
+    target_noise_clip: float = 5
     policy_delay: int = 2
     gamma: float = 0.9
     max_buffer_size: int = 2000

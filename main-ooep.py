@@ -135,6 +135,7 @@ simulator.add(
 class dqn():
     def __init__(self, observation_var, action_var, auto_fine_tune = False, sweep_config = {}) -> None:
         self.observation_var = observation_var
+        self.auto_fine_tune = auto_fine_tune
         self.action_var = action_var
         self.sweep_config = sweep_config
         self.args = tyro.cli(Args)
@@ -199,6 +200,7 @@ class dqn():
             # self.resample()
             self.label_working_time()
             self.cal_r()
+            self.cal_return()
             # self.normalize_input()
             Performance = np.mean(self.sensor_dic['result'][self.sensor_dic['Working_time'] == True])
             if  Performance>0.85:
@@ -208,7 +210,7 @@ class dqn():
                 torch.save(self.q_network.state_dict(), os.path.join(path_i, 'model.pth'))
             for i in range(self.sensor_dic.shape[0]-1):
                 obs_i = self.sensor_dic[self.observation_var].iloc[i]
-                next_obs_i = self.sensor_dic[self.observation_var].iloc[i]
+                next_obs_i = self.sensor_dic[self.observation_var].iloc[i+1]
                 actions_i = self.sensor_dic[self.action_var].iloc[i]
                 rewards_i = self.sensor_dic['reward'].iloc[i]
                 if self.sensor_dic['Working_time'].iloc[i]:
@@ -233,7 +235,7 @@ class dqn():
                             self.writer.add_scalar("losses/td_loss", loss, global_step)
                             self.writer.add_scalar("losses/q_values", old_val.mean().item(), global_step)
                             if self.args.track:
-                                if not self.train_auto_fine_tune:
+                                if not self.auto_fine_tune:
                                     wandb.init(
                                         project=self.args.wandb_project_name,
                                         entity=self.args.wandb_entity,
@@ -292,6 +294,11 @@ class dqn():
         nor_input = (self.sensor_dic[self.observation_var] - nor_min)/(nor_max - nor_min)
         self.sensor_dic[self.observation_var] = nor_input        
             
+    def normalize_input_i(self, state):
+        nor_min = np.array([22.8, 22, 0, 0, 0])
+        nor_max = np.array([33.3, 27, 1, 1, 1])
+        return (state- nor_min)/(nor_max - nor_min)
+                
     def handler(self, __event):
         global thinenv
         try:
@@ -305,6 +312,7 @@ class dqn():
 
         if not warm_up:
             state = [float(obs[i]) for i in self.observation_var]
+            state = self.normalize_input_i(state)
             state = torch.Tensor(state).cuda() if torch.cuda.is_available() and self.args.cuda else torch.Tensor(state).cpu()
             if random.random() < self.epsilon:
                 actions = random.sample(list(np.arange(0, self.args.output_dim)), 1)[0]
@@ -394,6 +402,8 @@ class dqn():
             result.append(result_i)            
         self.sensor_dic['reward'] = reward
         self.sensor_dic['result'] = result
+
+    def cal_return(self):
         # Return return function (future accmulated reward)
         R_list = []
         for i in range(self.sensor_dic.shape[0] - self.args.outlook_step):

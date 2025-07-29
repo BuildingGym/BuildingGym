@@ -6,6 +6,8 @@ test
 *.csv
 *.xls
 *.pdf
+*.xls
+*.txt
 *.epw
 PlayGame_Test-v25-For-PV.py
 RL control ref/*
@@ -18,3 +20,6 @@ Data/*
 !USA_FL_Miami.722020_TMY2.epw
 Archive results/*
 To do/*
+tmp/*
+!Small office-1A-Long.idf
+!Data/Day_mean.csv
