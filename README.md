@@ -31,6 +31,7 @@ Please install this package with python=3.11 and follow Installation guide.docx
 ## Acknowledgement
 The EnergyPlus model in showcase refers to [Large Office](https://bitbucket.org/sbslab-zuo/bem-cbecs/get/LargeOffice.zip) model in project of [Building Energy Models for Commercial Buildings Based on CBECS Data](https://www.colorado.edu/lab/sbs/BEM)
 
+## Citation
 Please cite our paper:
 <pre><code class="language-bibtex">
 @article{dai2025buildinggym,
