@@ -23,106 +23,22 @@
 - 😃 Applied to common control problem, e.g. demand respond, energy saving etc.
 
 ## Preparation
-Install [Energyplus](https://energyplus.net/), [Pytorch](https://pytorch.org/), [Gymnasium](https://github.com/Farama-Foundation/Gymnasium), [Wandb](https://wandb.ai/site)
-## Quickstart guide
-You can utilize the quickstart guide to train your reinforcement learning control algorithm tailored to address the specific problem you aim to solve. Simply execute the necessary steps for a general implementation.
-
-Or you can run the ```main.py``` to test the demo usage of this package.
-### Import the package
-```
-from epluspy import idf_editor
-from epluspy import idf_simu
-```
-### Read idf
-Read the EnergyPlus model (```.idf file```)
-```
-idf_file = 'Large office - 1AV940.idf'
-epw_file = 'USA_FL_Miami.722020_TMY2.epw'
-output_path = 'test\\'
-myidf = ep_simu(idf_file, epw_file, output_path, '2018-08-01', '2018-08-31', 6, True, True, 5)
-```
-### Define the control algorithm
-Hear we showcase the double deep Q learning algorithm.
-
-```
-# Define the RL algorithm as double deep Q learning algorithm
-rl_env = dqn(myidf)
-```
-If you want to customize the control agent (optional), see the example here
-```
-class QNetwork(nn.Module):
-    def __init__(self, input_dim, output_dim):
-        super().__init__()
-        self.network = nn.Sequential(
-            nn.Linear(input_dim, 120),
-            nn.ReLU(),
-            nn.Linear(120, 84),
-            nn.ReLU(),
-            nn.Linear(84, output_dim),
-        )
-
-    def forward(self, x):
-        return self.network(x)
-```
-
-### Define the sensor and actuator in EnergyPlus environment
-For the avaliable sensor and actuator, please check the list '''test\dry_run\rdd.csv''' and '''test\dry_run\edd.csv'''. See the example below to define them.
-Define the sensor:
-```
-myidf.sensor_call(Air_System_Outdoor_Air_Mass_Flow_Rate = 'VAV_1',
-                    Chiller_Electricity_Rate  = ['DOE REF 1980-2004 WATERCOOLED  CENTRIFUGAL CHILLER 0 1100TONS 0.7KW/TON'],
-                    Site_Outdoor_Air_Drybulb_Temperature = ['Environment'],
-                    Zone_Mean_Air_Temperature=['CORE_BOTTOM ZN'],
-                    Cooling_Coil_Total_Cooling_Rate=['VAV_1 CLG COIL'],
-                    Lights_Total_Heating_Rate=['CORE_BOTTOM ZN OFFICE WHOLEBUILDING - LG OFFICE LIGHTS'],
-                    Zone_People_Sensible_Heating_Rate=['CORE_BOTTOM ZN'])
-```
-Define the actuator (The control variable in RL):
-```
-myidf.actuator_call(Schedule_Value = [['ANN-ctrl', 'Schedule:Compact']])
-```
-### Define the control problem and reward function
-Define input variables for control algorithm. The format is "Sensor Type@Sensor Name". Please note that you mush claim the sensor using ```sensor_call()```  before define the input variables. See the example below:
-```
-input_var = ['Site Outdoor Air Drybulb Temperature@Environment',
-                'Zone Mean Air Temperature@CORE_BOTTOM ZN',
-                'Zone People Sensible Heating Rate@CORE_BOTTOM ZN']
-```
-
-### Define the reward function
-The reward function is defined according to the control target. During training process, the RL algorithm tries to increase the rewards. So higher reward means better control performance. This step is critical to achieve good control performance. See the example below to define the reward function.
-```
-def cal_r(self):
-    ```
-    reward: float, realtime reward value.
-    R: float, return reward.
-    ```
-    baseline = pd.read_csv('Data\Day_mean.csv')
-    reward = []
-    for j in range(myidf.n_days+1):
-        for k in range(24*myidf.n_time_step):
-            reward_i = abs(myidf.sensor_dic['Chiller Electricity Rate@DOE REF 1980-2004 WATERCOOLED  CENTRIFUGAL CHILLER 0 1100TONS 0.7KW/TON'][j*24*myidf.n_time_step+k] - baseline['Day_mean'][k])
-            reward.append(reward_i)
-    # Realtime reward function
-    myidf.sensor_dic['reward'] = reward
-    # Return return function (future accmulated reward)
-    R_list = []
-    for i in range(myidf.sensor_dic.shape[0] - args.outlook_step):
-        reward_list = myidf.sensor_dic['reward'][i:(i+ args.outlook_step)]
-        R = 0
-        for r in reward_list[::-1]:
-            R = r + R * args.gamma
-        R_list.append(R)
-```
-
-### Run the training
-After the above steps, you can finally start to train the RL control algorithm!
-```
-rl_env.train()
-```
+Please install this package with python=3.11 and follow Installation guide.docx
 
 ## License
 [MIT license](https://github.com/wandb/wandb/blob/main/LICENSE)
 
 ## Acknowledgement
 The EnergyPlus model in showcase refers to [Large Office](https://bitbucket.org/sbslab-zuo/bem-cbecs/get/LargeOffice.zip) model in project of [Building Energy Models for Commercial Buildings Based on CBECS Data](https://www.colorado.edu/lab/sbs/BEM)
+
+Please cite our paper:
+``
+@article{dai2025buildinggym,
+  title={BuildingGym: An open-source toolbox for AI-based building energy management using reinforcement learning},
+  author={Dai, Xilei and Chen, Ruotian and Guan, Songze and Li, Wen-Tai and Yuen, Chau},
+  Journal={Building Simulation},
+  pages={1--19},
+  year={2025},
+  organization={Springer}
+}
+``
