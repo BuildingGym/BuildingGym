@@ -18,7 +18,8 @@ Data/*
 !Large office - 1AV940.idf
 !Large office - 1AV232.idf
 !USA_FL_Miami.722020_TMY2.epw
-Archive results/*
+Archive results/*.csv
+Archive results/*.pth
 To do/*
 tmp/*
 !Small office-1A-Long.idf
