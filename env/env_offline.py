@@ -1,11 +1,11 @@
-from energyplus.ooep.addons.progress import ProgressProvider
+# from energyplus.ooep.addons.progress import ProgressProvider
 import asyncio
 import pandas as pd
 # from rl.ppo.network import Agent
 import random
 import numpy as np
 import time
-from energyplus import ooep
+# from energyplus import ooep
 # import rl
 import torch.nn.functional as F
 import os
@@ -19,23 +19,23 @@ from gymnasium.spaces import (
     Discrete
 )
 import torch
-from energyplus.ooep import (
-    Simulator,
-    Model,
-    Weather,
-    Report,
-)
+# from energyplus.ooep import (
+#     Simulator,
+#     Model,
+#     Weather,
+#     Report,
+# )
 import numpy as _numpy_
 import gymnasium as _gymnasium_
-from energyplus.ooep.components.variables import WallClock
-from energyplus.ooep.addons.rl import (
-    VariableBox,
-    SimulatorEnv,
-)
-from energyplus.ooep import (
-    Actuator,
-    OutputVariable,
-)
+# from energyplus.ooep.components.variables import WallClock
+# from energyplus.ooep.addons.rl import (
+#     VariableBox,
+#     SimulatorEnv,
+# )
+# from energyplus.ooep import (
+#     Actuator,
+#     OutputVariable,
+# )
 from energyplus.ooep.addons.rl.gymnasium import ThinEnv
 # from energyplus.dataset.basic import dataset as _epds_
 import torch.nn as nn
@@ -97,8 +97,8 @@ from controllables.core.tools.gymnasium import (
 class buildinggym_env():
     def __init__(self, idf_file,
                  epw_file,
-                 observation_space,
-                 action_space,
+                #  observation_space,
+                #  action_space,
                  observation_dim,
                  action_type,
                  args=None,

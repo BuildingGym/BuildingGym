@@ -1,15 +1,15 @@
 # from env.env_new_r import buildinggym_env
 from env.env import buildinggym_env
 import gymnasium as _gymnasium_
-from energyplus.ooep.addons.rl import (
-    VariableBox,
-    SimulatorEnv,
-)
-import math
-from energyplus.ooep import (
-    Actuator,
-    OutputVariable,
-)
+# from energyplus.ooep.addons.rl import (
+#     VariableBox,
+#     SimulatorEnv,
+# )
+# import math
+# from energyplus.ooep import (
+#     Actuator,
+#     OutputVariable,
+# )
 
 from rl.ppo.network import Agent
 from rl.util.schedule import ConstantSchedule
@@ -27,99 +27,99 @@ import tyro
 import time
 import torch as th
 
-observation_space = _gymnasium_.spaces.Dict({
-            't_out': VariableBox(
-                low=22.8, high=33.3,
-                dtype=_numpy_.float32,
-                shape=(),
-            ).bind(OutputVariable.Ref(
-                type='Site Outdoor Air Drybulb Temperature',
-                key='Environment',
-            )),
-            't_in': VariableBox(
-                low=22, high=27,
-                dtype=_numpy_.float32,
-                shape=(),
-            ).bind(OutputVariable.Ref(
-                type='Zone Mean Air Temperature',
-                key='Perimeter_ZN_1 ZN',
-            )),
-            'occ': VariableBox(
-                low=0, high=1,
-                dtype=_numpy_.float32,
-                shape=(),
-            ).bind(OutputVariable.Ref(
-                type='Schedule Value',
-                key='Small Office Bldg Occ',
-            )),
-            'light': VariableBox(
-                low=0, high=1,
-                dtype=_numpy_.float32,
-                shape=(),
-            ).bind(OutputVariable.Ref(
-                type='Schedule Value',
-                key='Office Bldg Light',
-            )),
-            'Equip': VariableBox(
-                low=0, high=1,
-                dtype=_numpy_.float32,
-                shape=(),
-            ).bind(OutputVariable.Ref(
-                type='Schedule Value',
-                key='Small Office Bldg Equip',
-            )),   
-            'Energy_1': VariableBox(
-                low=0, high=10000000,
-                dtype=_numpy_.float32,
-                shape=(),
-            ).bind(OutputVariable.Ref(
-                type='Cooling Coil Total Cooling Rate',
-                key='CORE_ZN ZN PSZ-AC-1 1SPD DX AC CLG COIL 34KBTU/HR 9.7SEER',
-            )),
-            'Energy_2': VariableBox(
-                low=0, high=10000000,
-                dtype=_numpy_.float32,
-                shape=(),
-            ).bind(OutputVariable.Ref(
-                type='Cooling Coil Total Cooling Rate',
-                key='PERIMETER_ZN_1 ZN PSZ-AC-2 1SPD DX AC CLG COIL 33KBTU/HR 9.7SEER',
-            )),
-            'Energy_3': VariableBox(
-                low=0, high=10000000,
-                dtype=_numpy_.float32,
-                shape=(),
-            ).bind(OutputVariable.Ref(
-                type='Cooling Coil Total Cooling Rate',
-                key='PERIMETER_ZN_2 ZN PSZ-AC-3 1SPD DX AC CLG COIL 23KBTU/HR 9.7SEER',
-            )),
-            'Energy_4': VariableBox(
-                low=0, high=10000000,
-                dtype=_numpy_.float32,
-                shape=(),
-            ).bind(OutputVariable.Ref(
-                type='Cooling Coil Total Cooling Rate',
-                key='PERIMETER_ZN_3 ZN PSZ-AC-4 1SPD DX AC CLG COIL 33KBTU/HR 9.7SEER',
-            )),
-            'Energy_5': VariableBox(
-                low=0, high=10000000,
-                dtype=_numpy_.float32,
-                shape=(),
-            ).bind(OutputVariable.Ref(
-                type='Cooling Coil Total Cooling Rate',
-                key='PERIMETER_ZN_4 ZN PSZ-AC-5 1SPD DX AC CLG COIL 25KBTU/HR 9.7SEER',
-            )),                                                
-        })
-action_space = _gymnasium_.spaces.Dict({
-                    'Thermostat': VariableBox(
-                        low=22., high=30.,
-                        dtype=_numpy_.float32,
-                        shape=(),
-                    ).bind(Actuator.Ref(
-                        type='Schedule:Compact',
-                        control_type='Schedule Value',
-                        key='Always 26',
-                    ))
-                })
+# observation_space = _gymnasium_.spaces.Dict({
+#             't_out': VariableBox(
+#                 low=22.8, high=33.3,
+#                 dtype=_numpy_.float32,
+#                 shape=(),
+#             ).bind(OutputVariable.Ref(
+#                 type='Site Outdoor Air Drybulb Temperature',
+#                 key='Environment',
+#             )),
+#             't_in': VariableBox(
+#                 low=22, high=27,
+#                 dtype=_numpy_.float32,
+#                 shape=(),
+#             ).bind(OutputVariable.Ref(
+#                 type='Zone Mean Air Temperature',
+#                 key='Perimeter_ZN_1 ZN',
+#             )),
+#             'occ': VariableBox(
+#                 low=0, high=1,
+#                 dtype=_numpy_.float32,
+#                 shape=(),
+#             ).bind(OutputVariable.Ref(
+#                 type='Schedule Value',
+#                 key='Small Office Bldg Occ',
+#             )),
+#             'light': VariableBox(
+#                 low=0, high=1,
+#                 dtype=_numpy_.float32,
+#                 shape=(),
+#             ).bind(OutputVariable.Ref(
+#                 type='Schedule Value',
+#                 key='Office Bldg Light',
+#             )),
+#             'Equip': VariableBox(
+#                 low=0, high=1,
+#                 dtype=_numpy_.float32,
+#                 shape=(),
+#             ).bind(OutputVariable.Ref(
+#                 type='Schedule Value',
+#                 key='Small Office Bldg Equip',
+#             )),   
+#             'Energy_1': VariableBox(
+#                 low=0, high=10000000,
+#                 dtype=_numpy_.float32,
+#                 shape=(),
+#             ).bind(OutputVariable.Ref(
+#                 type='Cooling Coil Total Cooling Rate',
+#                 key='CORE_ZN ZN PSZ-AC-1 1SPD DX AC CLG COIL 34KBTU/HR 9.7SEER',
+#             )),
+#             'Energy_2': VariableBox(
+#                 low=0, high=10000000,
+#                 dtype=_numpy_.float32,
+#                 shape=(),
+#             ).bind(OutputVariable.Ref(
+#                 type='Cooling Coil Total Cooling Rate',
+#                 key='PERIMETER_ZN_1 ZN PSZ-AC-2 1SPD DX AC CLG COIL 33KBTU/HR 9.7SEER',
+#             )),
+#             'Energy_3': VariableBox(
+#                 low=0, high=10000000,
+#                 dtype=_numpy_.float32,
+#                 shape=(),
+#             ).bind(OutputVariable.Ref(
+#                 type='Cooling Coil Total Cooling Rate',
+#                 key='PERIMETER_ZN_2 ZN PSZ-AC-3 1SPD DX AC CLG COIL 23KBTU/HR 9.7SEER',
+#             )),
+#             'Energy_4': VariableBox(
+#                 low=0, high=10000000,
+#                 dtype=_numpy_.float32,
+#                 shape=(),
+#             ).bind(OutputVariable.Ref(
+#                 type='Cooling Coil Total Cooling Rate',
+#                 key='PERIMETER_ZN_3 ZN PSZ-AC-4 1SPD DX AC CLG COIL 33KBTU/HR 9.7SEER',
+#             )),
+#             'Energy_5': VariableBox(
+#                 low=0, high=10000000,
+#                 dtype=_numpy_.float32,
+#                 shape=(),
+#             ).bind(OutputVariable.Ref(
+#                 type='Cooling Coil Total Cooling Rate',
+#                 key='PERIMETER_ZN_4 ZN PSZ-AC-5 1SPD DX AC CLG COIL 25KBTU/HR 9.7SEER',
+#             )),                                                
+#         })
+# action_space = _gymnasium_.spaces.Dict({
+#                     'Thermostat': VariableBox(
+#                         low=22., high=30.,
+#                         dtype=_numpy_.float32,
+#                         shape=(),
+#                     ).bind(Actuator.Ref(
+#                         type='Schedule:Compact',
+#                         control_type='Schedule Value',
+#                         key='Always 26',
+#                     ))
+#                 })
 schedule = ConstantSchedule(0.0001)
 input_sp = Box(np.array([0] * 5), np.array([1] * 5))
 # action_sp = Box(np.array([0, -0.5]), np.array([1, 0.5]))
@@ -131,8 +131,8 @@ elif isinstance(action_sp, Box):
 # agent = Agent(input_sp, action_sp, schedule.value)
 env = buildinggym_env('Small office-1A-Long.idf',
                     'USA_FL_Miami.722020_TMY2.epw',
-                    observation_space,
-                    action_space,
+                    # observation_space,
+                    # action_space,
                     input_sp.shape[0],
                     action_sp,
                     Args)

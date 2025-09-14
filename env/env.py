@@ -1,11 +1,11 @@
-from energyplus.ooep.addons.progress import ProgressProvider
+# from energyplus.ooep.addons.progress import ProgressProvider
 import asyncio
 import pandas as pd
-from rl.ppo.network import Agent
+# from rl.ppo.network import Agent
 import random
 import numpy as np
 import time
-from energyplus import ooep
+# from energyplus import ooep
 import torch.nn.functional as F
 import os
 from stable_baselines3.common.buffers import ReplayBuffer
@@ -18,60 +18,74 @@ from gymnasium.spaces import (
     Discrete
 )
 import torch
-from energyplus.ooep import (
-    Simulator,
-    Model,
-    Weather,
-    Report,
-)
+# from energyplus.ooep import (
+#     Simulator,
+#     Model,
+#     Weather,
+#     Report,
+# )
+
 import numpy as _numpy_
 import gymnasium as _gymnasium_
-from energyplus.ooep.components.variables import WallClock
-from energyplus.ooep.addons.rl import (
-    VariableBox,
-    SimulatorEnv,
-)
-from energyplus.ooep import (
-    Actuator,
-    OutputVariable,
-)
-from energyplus.ooep.addons.rl.gymnasium import ThinEnv
+# from energyplus.ooep.components.variables import WallClock
+# from energyplus.ooep.addons.rl import (
+#     VariableBox,
+#     SimulatorEnv,
+# )
+# from energyplus.ooep import (
+#     Actuator,
+#     OutputVariable,
+# )
+# from energyplus.ooep.addons.rl.gymnasium import ThinEnv
 # from energyplus.dataset.basic import dataset as _epds_
 import torch.nn as nn
 import wandb
 from rl.util.replaybuffer import ReplayBuffer
+from controllables.energyplus.events import Event
 
-async def energyplus_running(simulator, idf_file, epw_file):
-    await simulator.awaitable.run(
-        input=Simulator.InputSpecs(
-            model=(
-                idf_file
-            ),
-            weather=(epw_file),
-        ),
-        output=Simulator.OutputSpecs(
-            #report=('/tmp/ooep-report-9e1287d2-8e75-4cf5-bbc5-f76580b56a69'),
-        ),
-        options=Simulator.RuntimeOptions(
-            #design_day=True,
-        ),
-    ) 
+from controllables.core.tools.gymnasium import (
+    DictSpace,
+    BoxSpace,
+    Agent,
+)
+from controllables.energyplus import (
+    System,
+    #WeatherModel,
+    #Report,
+    Actuator,
+    OutputVariable,
+)
+# async def energyplus_running(simulator, idf_file, epw_file):
+#     await simulator.awaitable.run(
+#         input=Simulator.InputSpecs(
+#             model=(
+#                 idf_file
+#             ),
+#             weather=(epw_file),
+#         ),
+#         output=Simulator.OutputSpecs(
+#             #report=('/tmp/ooep-report-9e1287d2-8e75-4cf5-bbc5-f76580b56a69'),
+#         ),
+#         options=Simulator.RuntimeOptions(
+#             #design_day=True,
+#         ),
+#     ) 
 
 class buildinggym_env():
     def __init__(self, idf_file,
                  epw_file,
-                 observation_space,
-                 action_space,
+                #  observation_space,
+                #  action_space,
                  observation_dim,
                  action_type,
                  args,
                  ext_obs_bool = False,
                  agent = None) -> None:
-        global thinenv
-        self.simulator = Simulator().add(
-            ProgressProvider(),
-            #LogProvider(),
-        )
+        # global thinenv
+        # self.simulator = Simulator().add(
+        #     ProgressProvider(),
+        #     #LogProvider(),
+        # )
         self.buffer = ReplayBuffer(
             info=['obs', 'action', 'logprbs', 'rewards', 'values'],
             args=args
@@ -79,12 +93,12 @@ class buildinggym_env():
         self.idf_file = idf_file
         self.epw_file = epw_file
         self.ext_obs_bool = ext_obs_bool
-        self.simulator.add(
-            thinenv := ThinEnv(
-                action_space=action_space,    
-                observation_space=observation_space,
-            )
-        )
+        # self.simulator.add(
+        #     thinenv := ThinEnv(
+        #         action_space=action_space,    
+        #         observation_space=observation_space,
+        #     )
+        # )
         # To update:
         self.observation_space = Box(np.array([-np.inf] * observation_dim), np.array([np.inf] * observation_dim))
         
@@ -113,22 +127,245 @@ class buildinggym_env():
             self.obs_batch = torch.zeros(args.batch_size, observation_dim).to('cuda')
             self.action_batch = torch.zeros(args.batch_size, 1).to('cuda')
             self.return_batch = torch.zeros(args.batch_size, 1).to('cuda')
-        self.simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
+        # self.simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
         self.baseline = pd.read_csv('Data\\Day_mean.csv')
         self.com = 25
         self.best_performance = 0
+
+        self.world = world = System(
+            building='Small office-1A-Long.idf',
+            #world='tmp_timestep 10 min.idf',
+            weather='USA_FL_Miami.722020_TMY2.epw',
+        
+            report='tmp/ooep-report-9e1287d2-8e75-4cf5-bbc5-f76580b56a69',
+            repeat=False,
+            # design_day=False,
+        ).add('logging:progress')
+
+
+        self.env = Agent(dict(
+                action_space=DictSpace({
+                    'Thermostat': BoxSpace(
+                        low=22., high=30.,
+                        dtype=_numpy_.float32,
+                        shape=(),
+                    ).bind(world[Actuator.Ref(
+                        type='Schedule:Compact',
+                        control_type='Schedule Value',
+                        key='Always 26',
+                    )])
+                }),    
+                observation_space=DictSpace({
+                    't_in': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Zone Mean Air Temperature',
+                                key='Perimeter_ZN_1 ZN',
+                            )]),
+                    't_out': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Site Outdoor Air Drybulb Temperature',
+                                key='Environment',
+                            )]),
+                    'occ': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Schedule Value',
+                                key='Small Office Bldg Occ',
+                            )]),
+                    'light': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Schedule Value',
+                                key='Office Bldg Light',
+                            )]),
+                    'Equip': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Schedule Value',
+                                key='Small Office Bldg Equip',
+                            )]),
+                    'Energy_1': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Cooling Coil Total Cooling Rate',
+                                key='CORE_ZN ZN PSZ-AC-1 1SPD DX AC CLG COIL 34KBTU/HR 9.7SEER',
+                            )]),
+                    'Energy_2': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Cooling Coil Total Cooling Rate',
+                                key='PERIMETER_ZN_1 ZN PSZ-AC-2 1SPD DX AC CLG COIL 33KBTU/HR 9.7SEER',
+                            )]),
+                    'Energy_3': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Cooling Coil Total Cooling Rate',
+                                key='PERIMETER_ZN_2 ZN PSZ-AC-3 1SPD DX AC CLG COIL 23KBTU/HR 9.7SEER',
+                            )]),
+                    'Energy_4': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Cooling Coil Total Cooling Rate',
+                                key='PERIMETER_ZN_3 ZN PSZ-AC-4 1SPD DX AC CLG COIL 33KBTU/HR 9.7SEER',
+                            )]),
+                    'Energy_5': BoxSpace(
+                                low=-_numpy_.inf, high=+_numpy_.inf,
+                                dtype=_numpy_.float32,
+                                shape=(),
+                            ).bind(world[OutputVariable.Ref(
+                                type='Cooling Coil Total Cooling Rate',
+                                key='PERIMETER_ZN_4 ZN PSZ-AC-5 1SPD DX AC CLG COIL 25KBTU/HR 9.7SEER',
+                            )]),                                                                                                                                                                                                                                                                                                                       
+                }),
+            ))                
         # self.baseline['Time'] = pd.to_datetime(self.baseline['Time'], format='%m/%d/%Y %H:%M')
 
+        @self.world.on(Event.Ref('end_zone_timestep_after_zone_reporting', include_warmup=False))
+        def _(_):
+            global thinenv
+
+            # from energyplus.ooep import TemporaryUnavailableError
+            # try:
+            #     print(self.simulator.variables.getdefault(
+            #         ooep.WallClock.Ref()
+            #     ).value)
+            #     a = 1
+            # except TemporaryUnavailableError:
+            #     pass
+
+            try:
+                t = self.world['wallclock:calendar'].value
+                obs = self.env.observe()
+                # t = self.simulator.variables.getdefault(
+                #     ooep.WallClock.Ref()
+                # ).value
+                warm_up = False
+            except:
+                warm_up = True
+
+            if not warm_up:
+                state = [float(obs[i]) for i in self.inter_obs_var]
+                if self.ext_obs_bool:
+                    if t.hour == 0 or t.hour>self.t_index:
+                        self.ext_obs_var = self.get_ext_var(t)
+                        self.t_index = t.hour
+                    for _, value in self.ext_obs_var.items():
+                        state.append(value)
+                cooling_energy =  obs['Energy_1'].item() + obs['Energy_2'].item() + obs['Energy_3'].item() + obs['Energy_4'].item() + obs['Energy_5'].item()
+                state = self.normalize_input_i(state)
+                if self.ext_obs_bool:
+                    signal = state[-1]
+                else:
+                    signal = 0.5
+                state = torch.Tensor(state).cuda() if torch.cuda.is_available() and self.args.cuda else torch.Tensor(state).cpu()
+                with torch.no_grad():
+                    actions, value, logprob = self.agent(state)
+                    # actions = torch.argmax(q_values, dim=0).cpu().item()
+                self.com +=  (actions.cpu().item()-1)*0.5
+                self.com = max(min(self.com, 27), 23)
+                # self.com = 26
+                obs = pd.DataFrame(obs, index = [self.sensor_index])                
+                obs.insert(0, 'Time', t)
+                obs.insert(0, 'day_of_week', t.weekday())
+                obs.insert(1, 'Working time', self.label_working_time_i(t))            
+                obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', self.com)
+                reward_i, result_i, baseline_i = self.cal_r_i(cooling_energy, t, signal)
+                obs['cooling_energy'] = cooling_energy
+                obs['results'] = result_i
+                obs['rewards'] = reward_i
+                obs['baseline'] = baseline_i
+                obs['Signal'] = signal
+                obs['Target'] = 20000 * (1-0.3*signal)
+                obs.insert(obs.columns.get_loc("t_in") + 1, 'actions', actions.cpu().item())
+                obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().item())
+                if value is not None:
+                    obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value.cpu().item())
+
+
+                if self.sensor_index == 0:
+                    self.sensor_dic = pd.DataFrame({})
+                    self.sensor_dic = obs
+                    self.logprobs = [logprob]
+                    # self.values = [value]
+                    self.actions = [actions]
+                    self.states = [state]
+                    self.values = [value]
+                    self.rewards = [reward_i]
+                else:
+                    self.sensor_dic = pd.concat([self.sensor_dic, obs])           
+                    self.logprobs.append(logprob) 
+                    # self.values.append(value) 
+                    self.actions.append(actions)
+                    self.states.append(state)
+                    self.values.append(value)
+                    self.rewards.append(reward_i)
+                actions = actions.cpu().item()
+                # com = 25. + actions * 2
+                # act = thinenv.act({'Thermostat': self.com})
+                # act = thinenv.act({'Thermostat': 26})
+                self.env.action.value = {
+                'Thermostat': self.com,
+                }    
+                b  = self.args.outlook_steps + 1
+                if self.sensor_index > b:
+                    i = self.sensor_index-b
+                    if i % self.args.step_size == 0:
+                        if np.sum(self.sensor_dic['Working time'].iloc[i:(self.sensor_index)]) == b:
+                            ob_i = self.states[i]
+                            r_i = self.rewards[i+1]
+                            logp_i = self.logprobs[i]
+                            action_i = self.actions[i]
+                            R_i = self.cal_return(self.rewards[i+1:i+b])
+                            if self.batch_n< self.args.batch_size*self.args.n_steps:
+                                if value is not None:
+                                    self.buffer.add([ob_i, action_i, logp_i, r_i, value])   # List['obs', 'action', 'logprb', 'rewards', 'values']
+                                else:
+                                    self.buffer.add([ob_i, action_i, logp_i, r_i, R_i])   # List['obs', 'action', 'logprb', 'rewards', 'values']
+                                # self.obs_batch[self.batch_n, :] = ob_i
+                                # self.return_batch[self.batch_n, :] = R_i
+                                # self.action_batch[self.batch_n, :] = action_i
+                                self.batch_n+=1
+                            else:
+                                self.batch_n=0
+                                if value is not None:
+                                    self.buffer.cal_R_adv(self.args.batch_size)
+                                p_loss_i, v_loss_i = self.algo.train(self.buffer)
+                                self.buffer.reset()  # dxl: can update to be able to store somme history info
+                                self.p_loss_list.append(p_loss_i)
+                                self.v_loss_list.append(v_loss_i)
+                self.sensor_index+=1
     def setup(self, algo):
         self.algo = algo
         self.agent = self.algo.policy
         self.ready_to_train = True
         
-    def run(self, agent = None):
+    def run(self, agent = None, train = True):
+        self.train = train
         self.sensor_index = 0
         # if agent is not None:
         #     self.agent = agent
-        asyncio.run(energyplus_running(self.simulator, self.idf_file, self.epw_file))
+        # asyncio.run(energyplus_running(self.simulator, self.idf_file, self.epw_file))
+        self.world.start().wait()
 
     # def normalize_input(self, data=None):
     #     nor_min = np.array([22.8, 22, 0, 0, 0])
@@ -291,114 +528,114 @@ class buildinggym_env():
                 ext_obs_var[i] = random.choice([0])                        
         return ext_obs_var
 
-    def handler(self, __event):
-        global thinenv
+    # def handler(self, __event):
+    #     global thinenv
 
-        # from energyplus.ooep import TemporaryUnavailableError
-        # try:
-        #     print(self.simulator.variables.getdefault(
-        #         ooep.WallClock.Ref()
-        #     ).value)
-        #     a = 1
-        # except TemporaryUnavailableError:
-        #     pass
+    #     # from energyplus.ooep import TemporaryUnavailableError
+    #     # try:
+    #     #     print(self.simulator.variables.getdefault(
+    #     #         ooep.WallClock.Ref()
+    #     #     ).value)
+    #     #     a = 1
+    #     # except TemporaryUnavailableError:
+    #     #     pass
 
-        try:
-            obs = thinenv.observe()
-            t = self.simulator.variables.getdefault(
-                ooep.WallClock.Ref()
-            ).value
-            warm_up = False
-        except:
-            warm_up = True
+    #     try:
+    #         obs = thinenv.observe()
+    #         t = self.simulator.variables.getdefault(
+    #             ooep.WallClock.Ref()
+    #         ).value
+    #         warm_up = False
+    #     except:
+    #         warm_up = True
 
-        if not warm_up:
-            state = [float(obs[i]) for i in self.inter_obs_var]
-            if self.ext_obs_bool:
-                if t.hour == 0 or t.hour>self.t_index:
-                    self.ext_obs_var = self.get_ext_var(t)
-                    self.t_index = t.hour
-                for _, value in self.ext_obs_var.items():
-                    state.append(value)
-            cooling_energy =  obs['Energy_1'].item() + obs['Energy_2'].item() + obs['Energy_3'].item() + obs['Energy_4'].item() + obs['Energy_5'].item()
-            state = self.normalize_input_i(state)
-            if self.ext_obs_bool:
-                signal = state[-1]
-            else:
-                signal = 0.5
-            state = torch.Tensor(state).cuda() if torch.cuda.is_available() and self.args.cuda else torch.Tensor(state).cpu()
-            with torch.no_grad():
-                actions, value, logprob = self.agent(state)
-                # actions = torch.argmax(q_values, dim=0).cpu().item()
-            self.com +=  (actions.cpu().item()-1)*0.5
-            self.com = max(min(self.com, 27), 23)
-            # self.com = 26
-            obs = pd.DataFrame(obs, index = [self.sensor_index])                
-            obs.insert(0, 'Time', t)
-            obs.insert(0, 'day_of_week', t.weekday())
-            obs.insert(1, 'Working time', self.label_working_time_i(t))            
-            obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', self.com)
-            reward_i, result_i, baseline_i = self.cal_r_i(cooling_energy, t, signal)
-            obs['cooling_energy'] = cooling_energy
-            obs['results'] = result_i
-            obs['rewards'] = reward_i
-            obs['baseline'] = baseline_i
-            obs['Signal'] = signal
-            obs['Target'] = 20000 * (1-0.3*signal)
-            obs.insert(obs.columns.get_loc("t_in") + 1, 'actions', actions.cpu().item())
-            obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().item())
-            if value is not None:
-                obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value.cpu().item())
+    #     if not warm_up:
+    #         state = [float(obs[i]) for i in self.inter_obs_var]
+    #         if self.ext_obs_bool:
+    #             if t.hour == 0 or t.hour>self.t_index:
+    #                 self.ext_obs_var = self.get_ext_var(t)
+    #                 self.t_index = t.hour
+    #             for _, value in self.ext_obs_var.items():
+    #                 state.append(value)
+    #         cooling_energy =  obs['Energy_1'].item() + obs['Energy_2'].item() + obs['Energy_3'].item() + obs['Energy_4'].item() + obs['Energy_5'].item()
+    #         state = self.normalize_input_i(state)
+    #         if self.ext_obs_bool:
+    #             signal = state[-1]
+    #         else:
+    #             signal = 0.5
+    #         state = torch.Tensor(state).cuda() if torch.cuda.is_available() and self.args.cuda else torch.Tensor(state).cpu()
+    #         with torch.no_grad():
+    #             actions, value, logprob = self.agent(state)
+    #             # actions = torch.argmax(q_values, dim=0).cpu().item()
+    #         self.com +=  (actions.cpu().item()-1)*0.5
+    #         self.com = max(min(self.com, 27), 23)
+    #         # self.com = 26
+    #         obs = pd.DataFrame(obs, index = [self.sensor_index])                
+    #         obs.insert(0, 'Time', t)
+    #         obs.insert(0, 'day_of_week', t.weekday())
+    #         obs.insert(1, 'Working time', self.label_working_time_i(t))            
+    #         obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', self.com)
+    #         reward_i, result_i, baseline_i = self.cal_r_i(cooling_energy, t, signal)
+    #         obs['cooling_energy'] = cooling_energy
+    #         obs['results'] = result_i
+    #         obs['rewards'] = reward_i
+    #         obs['baseline'] = baseline_i
+    #         obs['Signal'] = signal
+    #         obs['Target'] = 20000 * (1-0.3*signal)
+    #         obs.insert(obs.columns.get_loc("t_in") + 1, 'actions', actions.cpu().item())
+    #         obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().item())
+    #         if value is not None:
+    #             obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value.cpu().item())
 
 
-            if self.sensor_index == 0:
-                self.sensor_dic = pd.DataFrame({})
-                self.sensor_dic = obs
-                self.logprobs = [logprob]
-                # self.values = [value]
-                self.actions = [actions]
-                self.states = [state]
-                self.values = [value]
-                self.rewards = [reward_i]
-            else:
-                self.sensor_dic = pd.concat([self.sensor_dic, obs])           
-                self.logprobs.append(logprob) 
-                # self.values.append(value) 
-                self.actions.append(actions)
-                self.states.append(state)
-                self.values.append(value)
-                self.rewards.append(reward_i)
-            actions = actions.cpu().item()
-            # com = 25. + actions * 2
-            act = thinenv.act({'Thermostat': self.com})
-            # act = thinenv.act({'Thermostat': 26})
+    #         if self.sensor_index == 0:
+    #             self.sensor_dic = pd.DataFrame({})
+    #             self.sensor_dic = obs
+    #             self.logprobs = [logprob]
+    #             # self.values = [value]
+    #             self.actions = [actions]
+    #             self.states = [state]
+    #             self.values = [value]
+    #             self.rewards = [reward_i]
+    #         else:
+    #             self.sensor_dic = pd.concat([self.sensor_dic, obs])           
+    #             self.logprobs.append(logprob) 
+    #             # self.values.append(value) 
+    #             self.actions.append(actions)
+    #             self.states.append(state)
+    #             self.values.append(value)
+    #             self.rewards.append(reward_i)
+    #         actions = actions.cpu().item()
+    #         # com = 25. + actions * 2
+    #         act = thinenv.act({'Thermostat': self.com})
+    #         # act = thinenv.act({'Thermostat': 26})
 
-            b  = self.args.outlook_steps + 1
-            if self.sensor_index > b:
-                i = self.sensor_index-b
-                if i % self.args.step_size == 0:
-                    if np.sum(self.sensor_dic['Working time'].iloc[i:(self.sensor_index)]) == b:
-                        ob_i = self.states[i]
-                        r_i = self.rewards[i+1]
-                        logp_i = self.logprobs[i]
-                        action_i = self.actions[i]
-                        R_i = self.cal_return(self.rewards[i+1:i+b])
-                        if self.batch_n< self.args.batch_size*self.args.n_steps:
-                            if value is not None:
-                                self.buffer.add([ob_i, action_i, logp_i, r_i, value])   # List['obs', 'action', 'logprb', 'rewards', 'values']
-                            else:
-                                self.buffer.add([ob_i, action_i, logp_i, r_i, R_i])   # List['obs', 'action', 'logprb', 'rewards', 'values']
-                            # self.obs_batch[self.batch_n, :] = ob_i
-                            # self.return_batch[self.batch_n, :] = R_i
-                            # self.action_batch[self.batch_n, :] = action_i
-                            self.batch_n+=1
-                        else:
-                            self.batch_n=0
-                            if value is not None:
-                                self.buffer.cal_R_adv(self.args.batch_size)
-                            p_loss_i, v_loss_i = self.algo.train(self.buffer)
-                            self.buffer.reset()  # dxl: can update to be able to store somme history info
-                            self.p_loss_list.append(p_loss_i)
-                            self.v_loss_list.append(v_loss_i)
+    #         b  = self.args.outlook_steps + 1
+    #         if self.sensor_index > b:
+    #             i = self.sensor_index-b
+    #             if i % self.args.step_size == 0:
+    #                 if np.sum(self.sensor_dic['Working time'].iloc[i:(self.sensor_index)]) == b:
+    #                     ob_i = self.states[i]
+    #                     r_i = self.rewards[i+1]
+    #                     logp_i = self.logprobs[i]
+    #                     action_i = self.actions[i]
+    #                     R_i = self.cal_return(self.rewards[i+1:i+b])
+    #                     if self.batch_n< self.args.batch_size*self.args.n_steps:
+    #                         if value is not None:
+    #                             self.buffer.add([ob_i, action_i, logp_i, r_i, value])   # List['obs', 'action', 'logprb', 'rewards', 'values']
+    #                         else:
+    #                             self.buffer.add([ob_i, action_i, logp_i, r_i, R_i])   # List['obs', 'action', 'logprb', 'rewards', 'values']
+    #                         # self.obs_batch[self.batch_n, :] = ob_i
+    #                         # self.return_batch[self.batch_n, :] = R_i
+    #                         # self.action_batch[self.batch_n, :] = action_i
+    #                         self.batch_n+=1
+    #                     else:
+    #                         self.batch_n=0
+    #                         if value is not None:
+    #                             self.buffer.cal_R_adv(self.args.batch_size)
+    #                         p_loss_i, v_loss_i = self.algo.train(self.buffer)
+    #                         self.buffer.reset()  # dxl: can update to be able to store somme history info
+    #                         self.p_loss_list.append(p_loss_i)
+    #                         self.v_loss_list.append(v_loss_i)
                             
-            self.sensor_index+=1
+    #         self.sensor_index+=1
