@@ -84,7 +84,8 @@ class Args:
     train_frequency: int = 5
     """the batch size (computed in runtime)"""        
 
-    device: str = 'cuda'
+    log_wandb: bool = False
+    device: str = 'cpu' # cuda if use gpu to train
     learning_rate: float = 0.01
     alpha: float = 0.99
     outlook_steps: int = 6

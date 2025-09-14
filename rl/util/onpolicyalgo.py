@@ -151,7 +151,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         # self.rollout_buffer = ReplayBuffer(self.buffer_info, args=self.args)
         
         self.policy = self.policy_class(  # type: ignore[assignment]
-            self.observation_space, self.action_space, self.lr_schedule, use_sde=self.use_sde, **self.policy_kwargs
+            self.observation_space, self.action_space, self.lr_schedule, use_sde=self.use_sde, args = self.args, **self.policy_kwargs
         )
         self.policy = self.policy.to(self.device)
     
@@ -317,9 +317,9 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         # rollout_buffer.compute_returns(outlook_steps = 5, gamma = self.gamma)
         # self.data_wt = self.data_wt[0:rollout_buffer.buffer_size]
         # rollout_buffer.remove_redundancy(rollout_buffer.wt_label)
-        callback.update_locals(locals())
-
-        callback.on_rollout_end()
+        if self.args.log_wandb:
+            callback.update_locals(locals())
+            callback.on_rollout_end()
 
         return True, performance
 
@@ -394,7 +394,8 @@ class OnPolicyAlgorithm(BaseAlgorithm):
 
             # self.env.p_loss, self.env.prob = self.train(max_train_perEp)
 
-        callback.on_training_end()
+        if self.args.log_wandb:
+            callback.on_training_end()
 
         return self, performance
 

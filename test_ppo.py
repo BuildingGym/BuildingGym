@@ -128,7 +128,7 @@ if isinstance(action_sp, Discrete):
     action_dim = action_sp.n
 elif isinstance(action_sp, Box):
     action_dim = action_sp.shape[0]
-agent = Agent(input_sp, action_sp, schedule.value)
+# agent = Agent(input_sp, action_sp, schedule.value)
 env = buildinggym_env('Small office-1A-Long.idf',
                     'USA_FL_Miami.722020_TMY2.epw',
                     observation_space,
@@ -170,7 +170,7 @@ run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 
 a = PPO(Agent,
         env,
-        Args,
+        args,
         run_name,
         # None,
         policy_kwargs = {'optimizer_class': args.optimizer_class},
@@ -178,14 +178,15 @@ a = PPO(Agent,
         )
 env.setup(algo=a)
 
-wandb.init(
-    project=args.wandb_project_name,
-    entity=args.wandb_entity,
-    sync_tensorboard=True,
-    config=args,
-    name=run_name,
-    save_code=False,
-)
+if args.log_wandb:
+    wandb.init(
+        project=args.wandb_project_name,
+        entity=args.wandb_entity,
+        sync_tensorboard=True,
+        config=args,
+        name=run_name,
+        save_code=False,
+    )
 _, performance = a.learn(args.total_epoch, None)
 
 

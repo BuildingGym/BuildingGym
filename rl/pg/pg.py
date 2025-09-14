@@ -99,7 +99,7 @@ class pg(OnPolicyAlgorithm):
         device: Union[th.device, str] = "auto",
         _init_setup_model: bool = True,
     ):
-        self.args = tyro.cli(args)
+        self.args = args
         self.my_callback = my_callback
         self.sweep_config = self.args
         super().__init__(

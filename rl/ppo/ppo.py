@@ -116,7 +116,7 @@ class PPO(OnPolicyAlgorithm):
         device: Union[th.device, str] = "auto",
         _init_setup_model: bool = True,
     ):
-        self.args = tyro.cli(Args)
+        self.args = args
         self.my_callback = my_callback
         self.sweep_config = self.args        
         super().__init__(
@@ -139,7 +139,7 @@ class PPO(OnPolicyAlgorithm):
             tensorboard_log=tensorboard_log,
             policy_kwargs=policy_kwargs,
             verbose=verbose,
-            device=device,
+            device=self.args.device,
             seed=seed,
             _init_setup_model=False,
             supported_action_spaces=(

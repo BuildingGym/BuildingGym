@@ -12,10 +12,10 @@ class Args:
     """seed of the experiment"""
     torch_deterministic: bool = True
     """if toggled, `torch.backends.cudnn.deterministic=False`"""
-    cuda: bool = True
-    """if toggled, cuda will be enabled by default"""
-    track: bool = True
-    """if toggled, this experiment will be tracked with Weights and Biases"""
+    # cuda: bool = True
+    # """if toggled, cuda will be enabled by default"""
+    # track: bool = True
+    # """if toggled, this experiment will be tracked with Weights and Biases"""
     wandb_project_name: str = "energygym-a2c-paper-fintune-ext_var"
     """the wandb's project name"""
     wandb_entity: str = 'buildinggym'
@@ -29,6 +29,8 @@ class Args:
     n_time_step: int = 6
     """the number of steps in one hour"""    
 
+    log_wandb: bool = False
+    device: str = 'cpu' # cuda if use gpu to train    
     learning_rate: float = 0.001
     alpha: float = 0.99
     outlook_steps: int = 6

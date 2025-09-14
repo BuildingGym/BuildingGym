@@ -56,7 +56,7 @@ class ReplayBuffer():
         # action_space: spaces.Space,
         info: List[str],
         args: None,
-        device: Union[th.device, str] = "cuda",
+        # device: Union[th.device, str] = "cuda",
         n_envs: int = 1,
         optimize_memory_usage: bool = False,
         handle_timeout_termination: bool = True,
@@ -64,7 +64,7 @@ class ReplayBuffer():
         # super().__init__(buffer_size, observation_space, action_space, device, n_envs)
         self.args = args
         self.info = info
-        self.device = device
+        self.device = self.args.device
         self.n_envs = n_envs
         self.R_adv_attr = False
         self._reset()
@@ -171,7 +171,10 @@ class ReplayBuffer():
                 self.advantages.append(self.advantages_i)
             self.returns = [j for sub in self.returns for j in sub]
             self.advantages = [j for sub in self.advantages for j in sub]
-            if self.args.cuda:
+            if self.args.device == 'cpu':
+                self.returns = [tensor for tensor in self.returns]
+                self.advantages = [tensor for tensor in self.advantages]
+            else:
                 self.returns = [tensor.cuda() for tensor in self.returns]
                 self.advantages = [tensor.cuda() for tensor in self.advantages]
                 # torch.tensor(self.returns, device='cuda')

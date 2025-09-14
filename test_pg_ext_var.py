@@ -172,7 +172,7 @@ run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 
 a = pg(Agent,
         env,
-        Args,
+        args,
         run_name,
         # my_callback,
         policy_kwargs = {'optimizer_class': args.optimizer_class},
@@ -180,14 +180,15 @@ a = pg(Agent,
         )
 env.setup(algo=a)
 
-wandb.init(
-    project=args.wandb_project_name,
-    entity=args.wandb_entity,
-    sync_tensorboard=True,
-    config=args,
-    name=run_name,
-    save_code=False,
-)
+if args.log_wandb:
+    wandb.init(
+        project=args.wandb_project_name,
+        entity=args.wandb_entity,
+        sync_tensorboard=True,
+        config=args,
+        name=run_name,
+        save_code=False,
+    )
 _, performance = a.learn(args.total_epoch, None)
 
 

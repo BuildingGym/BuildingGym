@@ -51,13 +51,14 @@ class Agent(nn.Module):
                 observation_space: spaces.Space,
                 action_space: spaces.Space,
                 lr_schedule: Schedule,
+                args:None,
                 net_arch: Optional[Union[List[int], Dict[str, List[int]]]] = None,
                 Fe_arch: Optional[Union[List[int], Dict[str, List[int]]]] = None,
                 optimizer_class: Type[th.optim.Optimizer] = th.optim.SGD,
                 activation_fn: Type[nn.Module] = nn.Tanh,
                 extract_features_bool: bool = True,
                 share_features_extractor: bool = True,
-                device: Union[str, torch.device] = 'cuda',
+                # device: Union[str, torch.device] = 'cuda',
                 optimizer_kwargs: Optional[Dict[str, Any]] = None,
                 use_sde: bool = False,
                 ortho_init: bool = False,
@@ -68,7 +69,8 @@ class Agent(nn.Module):
         self.observation_space = observation_space
         self.action_space = action_space
         self.extract_features_bool = extract_features_bool
-        self.device = device
+        self.args = args
+        self.device = self.args.device
         self.ortho_init = ortho_init
         if isinstance(net_arch, list) and len(net_arch) > 0 and isinstance(net_arch[0], dict):
             warnings.warn(

@@ -12,8 +12,8 @@ class Args:
     """if toggled, `torch.backends.cudnn.deterministic=False`"""
     cuda: bool = True
     """if toggled, cuda will be enabled by default"""
-    track: bool = True
-    """if toggled, this experiment will be tracked with Weights and Biases"""
+    # track: bool = True
+    # """if toggled, this experiment will be tracked with Weights and Biases"""
     wandb_project_name: str = "energygym-ppo-paper-finetune-ext_var"
     """the wandb's project name"""
     wandb_entity: str = 'buildinggym'
@@ -82,7 +82,10 @@ class Args:
     # learning_starts: int = 1
     """the batch size (computed in runtime)"""    
     # train_frequency: int = 1
-    """the batch size (computed in runtime)"""        
+    """the batch size (computed in runtime)"""     
+
+    log_wandb: bool = False
+    device: str = 'cpu' # cuda if use gpu to train       
 
     learning_rate: float = 0.001
     n_epochs: int = 2

@@ -141,9 +141,14 @@ class buildinggym_env():
         self.v_loss_list = []
         self.success_n = 0
         self.batch_n = 0
-        self.obs_batch = torch.zeros(args.batch_size, observation_dim).to('cuda')
-        self.action_batch = torch.zeros(args.batch_size, 1).to('cuda')
-        self.return_batch = torch.zeros(args.batch_size, 1).to('cuda')
+        if args.device == 'cpu':
+            self.obs_batch = torch.zeros(args.batch_size, observation_dim)
+            self.action_batch = torch.zeros(args.batch_size, 1)
+            self.return_batch = torch.zeros(args.batch_size, 1)           
+        else: 
+            self.obs_batch = torch.zeros(args.batch_size, observation_dim).to('cuda')
+            self.action_batch = torch.zeros(args.batch_size, 1).to('cuda')
+            self.return_batch = torch.zeros(args.batch_size, 1).to('cuda')
         # self.simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
         self.baseline = pd.read_csv('Data\\Day_mean.csv')
         self.com = 24

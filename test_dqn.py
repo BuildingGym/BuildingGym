@@ -180,14 +180,15 @@ a = DQN(Agent,
         )
 env.setup(algo=a)
 
-wandb.init(
-    project=args.wandb_project_name,
-    entity=args.wandb_entity,
-    sync_tensorboard=True,
-    config=args,
-    name=run_name,
-    save_code=False,
-)
+if args.log_wandb:
+    wandb.init(
+        project=args.wandb_project_name,
+        entity=args.wandb_entity,
+        sync_tensorboard=True,
+        config=args,
+        name=run_name,
+        save_code=False,
+    )
 _, performance = a.learn(args.total_epoch, None)
 
 
