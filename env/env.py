@@ -70,6 +70,9 @@ from controllables.energyplus import (
 #             #design_day=True,
 #         ),
 #     ) 
+from abc import ABC, abstractmethod
+import functools
+import inspect, ast
 
 class buildinggym_env():
     def __init__(self, idf_file,
@@ -128,7 +131,7 @@ class buildinggym_env():
             self.action_batch = torch.zeros(args.batch_size, 1).to('cuda')
             self.return_batch = torch.zeros(args.batch_size, 1).to('cuda')
         # self.simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
-        self.baseline = pd.read_csv('Data\\Day_mean.csv')
+        # self.baseline = pd.read_csv('Data\\Day_mean.csv')
         self.com = 25
         self.best_performance = 0
 
@@ -271,35 +274,52 @@ class buildinggym_env():
                         self.t_index = t.hour
                     for _, value in self.ext_obs_var.items():
                         state.append(value)
-                cooling_energy =  obs['Energy_1'].item() + obs['Energy_2'].item() + obs['Energy_3'].item() + obs['Energy_4'].item() + obs['Energy_5'].item()
+                # cooling_energy =  obs['Energy_1'].item() + obs['Energy_2'].item() + obs['Energy_3'].item() + obs['Energy_4'].item() + obs['Energy_5'].item()
                 state = self.normalize_input_i(state)
-                if self.ext_obs_bool:
-                    signal = state[-1]
-                else:
-                    signal = 0.5
+                # if self.ext_obs_bool:
+                #     signal = state[-1]
+                # else:
+                #     signal = 0.5
                 state = torch.Tensor(state).cuda() if torch.cuda.is_available() and self.args.cuda else torch.Tensor(state).cpu()
                 with torch.no_grad():
                     actions, value, logprob = self.agent(state)
                     # actions = torch.argmax(q_values, dim=0).cpu().item()
-                self.com +=  (actions.cpu().item()-1)*0.5
-                self.com = max(min(self.com, 27), 23)
+
+                # control function
+                self.control_fun(actions)               
+                # self.com +=  (actions.cpu().item()-1)*0.5
+                # self.com = max(min(self.com, 27), 23)
+
                 # self.com = 26
                 obs = pd.DataFrame(obs, index = [self.sensor_index])                
                 obs.insert(0, 'Time', t)
                 obs.insert(0, 'day_of_week', t.weekday())
                 obs.insert(1, 'Working time', self.label_working_time_i(t))            
                 obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', self.com)
-                reward_i, result_i, baseline_i = self.cal_r_i(cooling_energy, t, signal)
-                obs['cooling_energy'] = cooling_energy
-                obs['results'] = result_i
-                obs['rewards'] = reward_i
-                obs['baseline'] = baseline_i
-                obs['Signal'] = signal
-                obs['Target'] = 20000 * (1-0.3*signal)
-                obs.insert(obs.columns.get_loc("t_in") + 1, 'actions', actions.cpu().item())
-                obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().item())
+
+                # cal reward
+                # cooling_energy =  obs['Energy_1'].item() + obs['Energy_2'].item() + obs['Energy_3'].item() + obs['Energy_4'].item() + obs['Energy_5'].item()
+                # if self.ext_obs_bool:
+                #     signal = state[-1]
+                # else:
+                #     signal = 0.5                
+                # reward_i, result_i, baseline_i = self.cal_r_i(cooling_energy, t, signal)
+
+                # reward_i, result_i, baseline_i, signal, cooling_energy = self.cal_r_i(obs, state, t)
+                reward_output = self.cal_r_i(obs, state, t)
+                reward_i = reward_output['rewards']
+                for _, (k, v) in enumerate(reward_output.items()):
+                    obs[k] = v
+                # obs['cooling_energy'] = cooling_energy
+                # obs['results'] = result_i
+                # obs['rewards'] = reward_i
+                # obs['baseline'] = baseline_i
+                # obs['Signal'] = signal
+                # obs['Target'] = 20000 * (1-0.3*signal)
+                obs.insert(obs.columns.get_loc("rewards") + 1, 'actions', actions.cpu().item())
+                obs.insert(obs.columns.get_loc("rewards") + 1, 'logprobs', logprob.cpu().item())
                 if value is not None:
-                    obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value.cpu().item())
+                    obs.insert(obs.columns.get_loc("rewards") + 1, 'values', value.cpu().item())
 
 
                 if self.sensor_index == 0:
@@ -323,9 +343,9 @@ class buildinggym_env():
                 # com = 25. + actions * 2
                 # act = thinenv.act({'Thermostat': self.com})
                 # act = thinenv.act({'Thermostat': 26})
-                self.env.action.value = {
-                'Thermostat': self.com,
-                }    
+                # self.env.action.value = {
+                # 'Thermostat': self.com,
+                # }    
                 b  = self.args.outlook_steps + 1
                 if self.sensor_index > b:
                     i = self.sensor_index-b
@@ -366,7 +386,15 @@ class buildinggym_env():
         #     self.agent = agent
         # asyncio.run(energyplus_running(self.simulator, self.idf_file, self.epw_file))
         self.world.start().wait()
-
+    
+    @abstractmethod
+    def control_fun(self, actions):
+        self.com +=  (actions.cpu().item()-1)*0.5
+        self.com = max(min(self.com, 27), 23)
+        self.env.action.value = {
+        'Thermostat': self.com,
+        }     
+    
     # def normalize_input(self, data=None):
     #     nor_min = np.array([22.8, 22, 0, 0, 0])
     #     nor_mean = np.array([28.7, 26, 0.77, 0.57, 0.9])
@@ -387,12 +415,17 @@ class buildinggym_env():
 
     def normalize_input_i(self, state):
         # nor_min = np.array([22.8, 22, 0, 0, 0])
-
-        nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89, 0])
+        if self.ext_obs_bool:
+            nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89, 0])
+            std = np.array([2.17, 0.5, 0.39, 0.26, 0.26, 1])
+        else:
+            nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89])
+            std = np.array([2.17, 0.5, 0.39, 0.26, 0.26])
+            
         # nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89])
 
         # nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89])
-        std = np.array([2.17, 0.5, 0.39, 0.26, 0.26, 1])
+        # std = np.array([2.17, 0.5, 0.39, 0.26, 0.26, 1])
         # std = np.array([2.17, 0.5, 0.39, 0.26, 0.26])
 
         # std = np.array([2.17, 0.5, 0.39, 0.26, 0.26])
@@ -478,32 +511,38 @@ class buildinggym_env():
     #     self.sensor_dic['rewards'] = reward
     #     self.sensor_dic['results'] = result
 
-    def cal_r_i(self, data, time, signal):
+    def cal_r_i(self, obs, state, time):
+        ##____important: must define the rewards as the reward at each time step
+        cooling_energy =  obs['Energy_1'].item() + obs['Energy_2'].item() + obs['Energy_3'].item() + obs['Energy_4'].item() + obs['Energy_5'].item()
+        if self.ext_obs_bool:
+            signal = state[-1]
+        else:
+            signal = 0.5               
         # baseline = pd.read_csv('Data\Day_mean.csv')
         hour = time.hour
         min = time.minute
         idx = int(hour*6+int(min/10))
-        baseline_i = self.baseline['Day_mean'].iloc[idx]
+        # baseline_i = self.baseline['Day_mean'].iloc[idx]
         baseline_i = 20000
         # reward_i = max(round(0.3 - abs(data ** 2 - baseline_i ** 2)/baseline_i ** 2,2),-0.4)*5
         # result_i = round(1 - abs(data - baseline_i)/baseline_i,2)
         # return reward_i, result_i, baseline_i
         # baseline_energy = self.baseline['cooling_energy'].iloc[idx]
-        actual_reduction = (baseline_i - data) / baseline_i
+        actual_reduction = (baseline_i - cooling_energy) / baseline_i
         
         # Target reduction percentage
         target_reduction = 0.3 * signal
         
         # if abs(actual_reduction-target_reduction) < 0.05:
-        #     energy_reward = 5
+        #     self.reward_i = 5
         # elif abs(actual_reduction-target_reduction) < 0.15:
-        #     energy_reward = 2
+        #     self.reward_i = 2
         # else:
-        #     energy_reward = -1
-        energy_reward = 1.5 - abs(actual_reduction - target_reduction) * 10
-        # if energy_reward<-5:
-        #     energy_reward = -5
-        return energy_reward, actual_reduction, baseline_i
+        #     self.reward_i = -1
+        self.reward_i = 1.5 - abs(actual_reduction - target_reduction) * 10
+        # if self.reward_i<-5:
+        #     self.reward_i = -5
+        return {'rewards':self.reward_i, 'actual_reduction': actual_reduction, 'baseline_i': baseline_i, 'signal': signal, 'cooling_energy': cooling_energy}
         
     
     def cal_return(self, reward_list):
@@ -527,6 +566,38 @@ class buildinggym_env():
             for i in self.ext_obs_var:
                 ext_obs_var[i] = random.choice([0])                        
         return ext_obs_var
+    
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+
+        # If subclass provides its own 'control_fun', wrap it to enforce the rule.
+        if "control_fun" in cls.__dict__:
+            original = cls.__dict__["control_fun"]
+
+            @functools.wraps(original)
+            def _wrapped(self, *args, **kw):
+                result = original(self, *args, **kw)
+                if result is not self.com:  # identity, not just equality
+                    raise ValueError(
+                        f"{cls.__name__}.control_fun() must return self.com (same object)."
+                    )
+                return result
+
+            setattr(cls, "control_fun", _wrapped)
+
+        if "cal_r_i" in cls.__dict__:
+            original = cls.__dict__["cal_r_i"]
+
+            @functools.wraps(original)
+            def _wrapped(self, *args, **kw):
+                result = original(self, *args, **kw)
+                if result is not self.reward_i:  # identity, not just equality
+                    raise ValueError(
+                        f"{cls.__name__}.cal_r_i() must return self.reward_i (same object)."
+                    )
+                return result
+
+            setattr(cls, "cal_r_i", _wrapped)      
 
     # def handler(self, __event):
     #     global thinenv

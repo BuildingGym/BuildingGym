@@ -150,7 +150,7 @@ class buildinggym_env():
             self.action_batch = torch.zeros(args.batch_size, 1).to('cuda')
             self.return_batch = torch.zeros(args.batch_size, 1).to('cuda')
         # self.simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
-        self.baseline = pd.read_csv('Data\\Day_mean.csv')
+        # self.baseline = pd.read_csv('Data\\Day_mean.csv')
         self.com = 24
         self.best_performance = 0
         # self.baseline['Time'] = pd.to_datetime(self.baseline['Time'], format='%m/%d/%Y %H:%M')
@@ -422,13 +422,15 @@ class buildinggym_env():
 
 
     def normalize_input_i(self, state):
-        nor_min = np.array([22.8, 22, 0, 0, 0])
-        nor_mean = np.array([29.3, 25, 0.78, 0.58, 0.89, 0])
-        nor_mean = np.array([29.3, 25, 0.78, 0.58, 0.89])
-        std = np.array([2, 2, 0.39, 0.26, 0.26, 1])
-        std = np.array([2, 2, 0.39, 0.26, 0.26])
+        # nor_min = np.array([22.8, 22, 0, 0, 0])
+        if self.ext_obs_bool:
+            nor_mean = np.array([29.3, 25, 0.78, 0.58, 0.89, 0])
+            std = np.array([2, 2, 0.39, 0.26, 0.26, 1])
+        else:
+            nor_mean = np.array([29.3, 25, 0.78, 0.58, 0.89])
+            std = np.array([2, 2, 0.39, 0.26, 0.26])
         # nor_min = np.array([0, 0, 0, 0, 0])
-        nor_max = np.array([33.3, 27, 1, 1, 1])
+        # nor_max = np.array([33.3, 27, 1, 1, 1])
         # nor_max = np.array([1, 1, 1, 1, 1])
         return (state- nor_mean)/std
 
@@ -486,7 +488,7 @@ class buildinggym_env():
         hour = time.hour
         min = time.minute
         idx = int(hour*6+int(min/10))
-        baseline_i = self.baseline['Day_mean'].iloc[idx]
+        # baseline_i = self.baseline['Day_mean'].iloc[idx]
         baseline_i = 20000
         # reward_i = max(round(0.3 - abs(data ** 2 - baseline_i ** 2)/baseline_i ** 2,2),-0.4)*5
         # result_i = round(1 - abs(data - baseline_i)/baseline_i,2)
