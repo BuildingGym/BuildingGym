@@ -1,0 +1,5 @@
+20250915
+1. support log and device configuration
+    log_wandb: bool = False
+    device: str = 'cpu' # cuda if use gpu to train    
+2. remove some unused packages
