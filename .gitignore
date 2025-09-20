@@ -25,3 +25,5 @@ tmp/*
 !Small office-1A-Long.idf
 !Data/Day_mean.csv
 !Update log.txt
+!requirements3.txt
+!requirements4.txt
