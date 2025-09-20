@@ -27,7 +27,9 @@
 - 😃 Applied to common control problem, e.g. demand respond, energy saving etc.
 
 ## Preparation
-Please install this package with python=3.11 and follow Installation guide.docx
+Please install this package with python=3.11 and follow Installation guide.docx. 
+
+Please note the supported EnergyPlus model file is v23.2. For model in other version, please convert to 23.2. See [here](https://bigladdersoftware.com/epx/docs/9-4/tips-and-tricks-using-energyplus/converting-older-version-energyplus-files.html) for help
 
 ## License
 [MIT license](https://github.com/wandb/wandb/blob/main/LICENSE)
