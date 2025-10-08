@@ -19,7 +19,7 @@ from stable_baselines3.common.vec_env import VecEnv
 from env.env import buildinggym_env
 import torch
 import random
-from rl.a2c.network import Agent
+from rl.a2c.network import policy_network
 import os
 
 SelfOnPolicyAlgorithm = TypeVar("SelfOnPolicyAlgorithm", bound="OnPolicyAlgorithm")
@@ -64,11 +64,11 @@ class OnPolicyAlgorithm(BaseAlgorithm):
 
     rollout_buffer: ReplayBuffer
     # policy: Union[str, Type[ActorCriticPolicy], Agent]
-    policy: Union[str, Type[Agent]]
+    policy: Union[str, Type[policy_network]]
 
     def __init__(
         self,
-        policy: Union[str, Type[Agent]],
+        policy: Union[str, Type[policy_network]],
         # policy: Union[str, Type[ActorCriticPolicy], Agent],
         env: buildinggym_env,
         learning_rate: Union[float, Schedule],

@@ -1,3 +1,7 @@
+20251004
+Move all setting to test_*.py, include both w/wt external signals
+
+
 20250920
 Add installation requirement
 

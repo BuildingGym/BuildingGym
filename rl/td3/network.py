@@ -227,7 +227,7 @@ class ContinuousCritic(nn.Module):
         self.train(mode)    
 
 
-class Agent(nn.Module):
+class policy_network(nn.Module):
     """
     Policy class (with both actor and critic) for TD3.
 

@@ -10,7 +10,7 @@ from rl.util.callback import mycallback
 import numpy as np
 import torch as th
 from gymnasium import spaces
-from rl.td3.network import Agent
+from rl.td3.network import policy_network
 import os
 import torch
 from rl.util.base_class import BaseAlgorithm
@@ -85,7 +85,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
 
     def __init__(
         self,
-        policy: Union[str, Type[Agent]],
+        policy: Union[str, Type[policy_network]],
         env: buildinggym_env,
         # run_name: str,
         learning_rate: Union[float, Schedule] = 1e-4,

@@ -47,7 +47,7 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     return layer
 
 
-class Agent(nn.Module):
+class policy_network(nn.Module):
     def __init__(self, 
                 observation_space: spaces.Space,
                 action_space: spaces.Space,
@@ -65,7 +65,7 @@ class Agent(nn.Module):
                 ortho_init: bool = False,
                 xa_init_gain: float = 0.5,
                 ):
-        super(Agent, self).__init__()
+        super(policy_network, self).__init__()
         self.activation_fn = activation_fn
         self.observation_space = observation_space
         self.action_space = action_space

@@ -25,6 +25,8 @@ import torch
 #     Weather,
 #     Report,
 # )
+from abc import ABC, abstractmethod
+
 import numpy as _numpy_
 import gymnasium as _gymnasium_
 # from energyplus.ooep.components.variables import WallClock
@@ -97,12 +99,15 @@ from controllables.core.tools.gymnasium import (
 class buildinggym_env():
     def __init__(self, idf_file,
                  epw_file,
+                 ep_world,
+                 ep_para,                 
                 #  observation_space,
                 #  action_space,
-                 observation_dim,
+                #  observation_dim,
                  action_type,
-                 args=None,
-                 ext_obs_bool = False,
+                 args,
+                 inter_obs_var,
+                 ext_obs_var = None,
                  agent = None) -> None:
         # global thinenv
         # self.simulator = Simulator().add(
@@ -115,7 +120,10 @@ class buildinggym_env():
             )
         self.idf_file = idf_file
         self.epw_file = epw_file
-        self.ext_obs_bool = ext_obs_bool
+        if ext_obs_var is not None:
+            self.ext_obs_bool = True
+        else:
+            self.ext_obs_bool = False
         # self.simulator.add(
         #     thinenv := ThinEnv(
         #         action_space=action_space,    
@@ -123,16 +131,26 @@ class buildinggym_env():
         #     )
         # )
         # To update:
-        self.observation_space = Box(np.array([-np.inf] * observation_dim), np.array([np.inf] * observation_dim))
+        # self.inter_obs_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
+        self.inter_obs_var = inter_obs_var
+        # self.ext_obs_var = ['signal']
+        self.ext_obs_var = ext_obs_var
+        if not self.ext_obs_bool:
+            self.observation_dim = len(self.inter_obs_var)
+        else:
+            self.observation_dim = len(self.inter_obs_var) + len(self.ext_obs_var)
+        self.observation_space = Box(np.array([-np.inf] * self.observation_dim), np.array([np.inf] * self.observation_dim))
+                
+        # self.observation_space = Box(np.array([-np.inf] * observation_dim), np.array([np.inf] * observation_dim))
         
         if isinstance(action_type, Box):
             self.action_space = Box(action_type.low, action_type.high)
         if isinstance(action_type, Discrete):
             self.action_space = Discrete(action_type.n)
-        self.inter_obs_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
-        self.ext_obs_var = ['signal']       
+        # self.inter_obs_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
+        # self.ext_obs_var = ['signal']       
         # self.observation_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
-        self.action_var = ['Thermostat']
+        # self.action_var = ['Thermostat']
         self.num_envs = 1
         self.agent = agent
         self.ready_to_train = False
@@ -142,11 +160,11 @@ class buildinggym_env():
         self.success_n = 0
         self.batch_n = 0
         if args.device == 'cpu':
-            self.obs_batch = torch.zeros(args.batch_size, observation_dim)
+            self.obs_batch = torch.zeros(args.batch_size, self.observation_dim)
             self.action_batch = torch.zeros(args.batch_size, 1)
             self.return_batch = torch.zeros(args.batch_size, 1)           
         else: 
-            self.obs_batch = torch.zeros(args.batch_size, observation_dim).to('cuda')
+            self.obs_batch = torch.zeros(args.batch_size, self.observation_dim).to('cuda')
             self.action_batch = torch.zeros(args.batch_size, 1).to('cuda')
             self.return_batch = torch.zeros(args.batch_size, 1).to('cuda')
         # self.simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
@@ -169,113 +187,115 @@ class buildinggym_env():
         #         # design_day=False,
         #     ),
         # ).add('logging:progress')
+        self.world = ep_world
+        self.ep_para = ep_para
 
-        self.world = world = System(
-            building='Small office-1A-Long.idf',
-            #world='tmp_timestep 10 min.idf',
-            weather='USA_FL_Miami.722020_TMY2.epw',
+        # self.world = world = System(
+        #     building='Small office-1A-Long.idf',
+        #     #world='tmp_timestep 10 min.idf',
+        #     weather='USA_FL_Miami.722020_TMY2.epw',
         
-            report='tmp/ooep-report-9e1287d2-8e75-4cf5-bbc5-f76580b56a69',
-            repeat=False,
-            # design_day=False,
-        ).add('logging:progress')
+        #     report='tmp/ooep-report-9e1287d2-8e75-4cf5-bbc5-f76580b56a69',
+        #     repeat=False,
+        #     # design_day=False,
+        # ).add('logging:progress')
 
 
-        self.env = Agent(dict(
-                action_space=DictSpace({
-                    'Thermostat': BoxSpace(
-                        low=22., high=30.,
-                        dtype=_numpy_.float32,
-                        shape=(),
-                    ).bind(world[Actuator.Ref(
-                        type='Schedule:Compact',
-                        control_type='Schedule Value',
-                        key='Always 26',
-                    )])
-                }),    
-                observation_space=DictSpace({
-                    't_in': BoxSpace(
-                                low=-_numpy_.inf, high=+_numpy_.inf,
-                                dtype=_numpy_.float32,
-                                shape=(),
-                            ).bind(world[OutputVariable.Ref(
-                                type='Zone Mean Air Temperature',
-                                key='Perimeter_ZN_1 ZN',
-                            )]),
-                    't_out': BoxSpace(
-                                low=-_numpy_.inf, high=+_numpy_.inf,
-                                dtype=_numpy_.float32,
-                                shape=(),
-                            ).bind(world[OutputVariable.Ref(
-                                type='Site Outdoor Air Drybulb Temperature',
-                                key='Environment',
-                            )]),
-                    'occ': BoxSpace(
-                                low=-_numpy_.inf, high=+_numpy_.inf,
-                                dtype=_numpy_.float32,
-                                shape=(),
-                            ).bind(world[OutputVariable.Ref(
-                                type='Schedule Value',
-                                key='Small Office Bldg Occ',
-                            )]),
-                    'light': BoxSpace(
-                                low=-_numpy_.inf, high=+_numpy_.inf,
-                                dtype=_numpy_.float32,
-                                shape=(),
-                            ).bind(world[OutputVariable.Ref(
-                                type='Schedule Value',
-                                key='Office Bldg Light',
-                            )]),
-                    'Equip': BoxSpace(
-                                low=-_numpy_.inf, high=+_numpy_.inf,
-                                dtype=_numpy_.float32,
-                                shape=(),
-                            ).bind(world[OutputVariable.Ref(
-                                type='Schedule Value',
-                                key='Small Office Bldg Equip',
-                            )]),
-                    'Energy_1': BoxSpace(
-                                low=-_numpy_.inf, high=+_numpy_.inf,
-                                dtype=_numpy_.float32,
-                                shape=(),
-                            ).bind(world[OutputVariable.Ref(
-                                type='Cooling Coil Total Cooling Rate',
-                                key='CORE_ZN ZN PSZ-AC-1 1SPD DX AC CLG COIL 34KBTU/HR 9.7SEER',
-                            )]),
-                    'Energy_2': BoxSpace(
-                                low=-_numpy_.inf, high=+_numpy_.inf,
-                                dtype=_numpy_.float32,
-                                shape=(),
-                            ).bind(world[OutputVariable.Ref(
-                                type='Cooling Coil Total Cooling Rate',
-                                key='PERIMETER_ZN_1 ZN PSZ-AC-2 1SPD DX AC CLG COIL 33KBTU/HR 9.7SEER',
-                            )]),
-                    'Energy_3': BoxSpace(
-                                low=-_numpy_.inf, high=+_numpy_.inf,
-                                dtype=_numpy_.float32,
-                                shape=(),
-                            ).bind(world[OutputVariable.Ref(
-                                type='Cooling Coil Total Cooling Rate',
-                                key='PERIMETER_ZN_2 ZN PSZ-AC-3 1SPD DX AC CLG COIL 23KBTU/HR 9.7SEER',
-                            )]),
-                    'Energy_4': BoxSpace(
-                                low=-_numpy_.inf, high=+_numpy_.inf,
-                                dtype=_numpy_.float32,
-                                shape=(),
-                            ).bind(world[OutputVariable.Ref(
-                                type='Cooling Coil Total Cooling Rate',
-                                key='PERIMETER_ZN_3 ZN PSZ-AC-4 1SPD DX AC CLG COIL 33KBTU/HR 9.7SEER',
-                            )]),
-                    'Energy_5': BoxSpace(
-                                low=-_numpy_.inf, high=+_numpy_.inf,
-                                dtype=_numpy_.float32,
-                                shape=(),
-                            ).bind(world[OutputVariable.Ref(
-                                type='Cooling Coil Total Cooling Rate',
-                                key='PERIMETER_ZN_4 ZN PSZ-AC-5 1SPD DX AC CLG COIL 25KBTU/HR 9.7SEER',
-                            )]),                                                                                                                                                                                                                                                                                                                       
-                }),
-            ))        
+        # self.env = Agent(dict(
+        #         action_space=DictSpace({
+        #             'Thermostat': BoxSpace(
+        #                 low=22., high=30.,
+        #                 dtype=_numpy_.float32,
+        #                 shape=(),
+        #             ).bind(world[Actuator.Ref(
+        #                 type='Schedule:Compact',
+        #                 control_type='Schedule Value',
+        #                 key='Always 26',
+        #             )])
+        #         }),    
+        #         observation_space=DictSpace({
+        #             't_in': BoxSpace(
+        #                         low=-_numpy_.inf, high=+_numpy_.inf,
+        #                         dtype=_numpy_.float32,
+        #                         shape=(),
+        #                     ).bind(world[OutputVariable.Ref(
+        #                         type='Zone Mean Air Temperature',
+        #                         key='Perimeter_ZN_1 ZN',
+        #                     )]),
+        #             't_out': BoxSpace(
+        #                         low=-_numpy_.inf, high=+_numpy_.inf,
+        #                         dtype=_numpy_.float32,
+        #                         shape=(),
+        #                     ).bind(world[OutputVariable.Ref(
+        #                         type='Site Outdoor Air Drybulb Temperature',
+        #                         key='Environment',
+        #                     )]),
+        #             'occ': BoxSpace(
+        #                         low=-_numpy_.inf, high=+_numpy_.inf,
+        #                         dtype=_numpy_.float32,
+        #                         shape=(),
+        #                     ).bind(world[OutputVariable.Ref(
+        #                         type='Schedule Value',
+        #                         key='Small Office Bldg Occ',
+        #                     )]),
+        #             'light': BoxSpace(
+        #                         low=-_numpy_.inf, high=+_numpy_.inf,
+        #                         dtype=_numpy_.float32,
+        #                         shape=(),
+        #                     ).bind(world[OutputVariable.Ref(
+        #                         type='Schedule Value',
+        #                         key='Office Bldg Light',
+        #                     )]),
+        #             'Equip': BoxSpace(
+        #                         low=-_numpy_.inf, high=+_numpy_.inf,
+        #                         dtype=_numpy_.float32,
+        #                         shape=(),
+        #                     ).bind(world[OutputVariable.Ref(
+        #                         type='Schedule Value',
+        #                         key='Small Office Bldg Equip',
+        #                     )]),
+        #             'Energy_1': BoxSpace(
+        #                         low=-_numpy_.inf, high=+_numpy_.inf,
+        #                         dtype=_numpy_.float32,
+        #                         shape=(),
+        #                     ).bind(world[OutputVariable.Ref(
+        #                         type='Cooling Coil Total Cooling Rate',
+        #                         key='CORE_ZN ZN PSZ-AC-1 1SPD DX AC CLG COIL 34KBTU/HR 9.7SEER',
+        #                     )]),
+        #             'Energy_2': BoxSpace(
+        #                         low=-_numpy_.inf, high=+_numpy_.inf,
+        #                         dtype=_numpy_.float32,
+        #                         shape=(),
+        #                     ).bind(world[OutputVariable.Ref(
+        #                         type='Cooling Coil Total Cooling Rate',
+        #                         key='PERIMETER_ZN_1 ZN PSZ-AC-2 1SPD DX AC CLG COIL 33KBTU/HR 9.7SEER',
+        #                     )]),
+        #             'Energy_3': BoxSpace(
+        #                         low=-_numpy_.inf, high=+_numpy_.inf,
+        #                         dtype=_numpy_.float32,
+        #                         shape=(),
+        #                     ).bind(world[OutputVariable.Ref(
+        #                         type='Cooling Coil Total Cooling Rate',
+        #                         key='PERIMETER_ZN_2 ZN PSZ-AC-3 1SPD DX AC CLG COIL 23KBTU/HR 9.7SEER',
+        #                     )]),
+        #             'Energy_4': BoxSpace(
+        #                         low=-_numpy_.inf, high=+_numpy_.inf,
+        #                         dtype=_numpy_.float32,
+        #                         shape=(),
+        #                     ).bind(world[OutputVariable.Ref(
+        #                         type='Cooling Coil Total Cooling Rate',
+        #                         key='PERIMETER_ZN_3 ZN PSZ-AC-4 1SPD DX AC CLG COIL 33KBTU/HR 9.7SEER',
+        #                     )]),
+        #             'Energy_5': BoxSpace(
+        #                         low=-_numpy_.inf, high=+_numpy_.inf,
+        #                         dtype=_numpy_.float32,
+        #                         shape=(),
+        #                     ).bind(world[OutputVariable.Ref(
+        #                         type='Cooling Coil Total Cooling Rate',
+        #                         key='PERIMETER_ZN_4 ZN PSZ-AC-5 1SPD DX AC CLG COIL 25KBTU/HR 9.7SEER',
+        #                     )]),                                                                                                                                                                                                                                                                                                                       
+        #         }),
+        #     ))        
 
 
         @self.world.on(Event.Ref('end_zone_timestep_after_zone_reporting', include_warmup=False))
@@ -283,7 +303,7 @@ class buildinggym_env():
             global thinenv
             try:
                 t = self.world['wallclock:calendar'].value
-                obs = self.env.observe()
+                obs = self.ep_para.observe()
                 # t = self.simulator.variables.getdefault(
                 #     ooep.WallClock.Ref()
                 # ).value
@@ -299,16 +319,17 @@ class buildinggym_env():
                         self.t_index = t.hour
                     for _, value in self.ext_obs_var.items():
                         state.append(value)
-                cooling_energy =  obs['Energy_1'].item() + obs['Energy_2'].item() + obs['Energy_3'].item() + obs['Energy_4'].item() + obs['Energy_5'].item()
+                # cooling_energy =  obs['Energy_1'].item() + obs['Energy_2'].item() + obs['Energy_3'].item() + obs['Energy_4'].item() + obs['Energy_5'].item()
                 state = self.normalize_input_i(state)
-                if self.ext_obs_bool:
-                    signal = state[-1]
-                else:
-                    signal = 0.5
+                # if self.ext_obs_bool:
+                #     signal = state[-1]
+                # else:
+                #     signal = 0.5
                 state = torch.Tensor(state).cuda() if torch.cuda.is_available() and self.args.device == 'cuda'  else torch.Tensor(state).cpu()
                 with torch.no_grad():
                     actions = self.agent(state)
                     # actions = torch.argmax(q_values, dim=0).cpu().item()
+                self.control_fun(actions)               
                 if random.random() < self.epsilon:
                 # if random.random() < 1.1:
                     if type(self.algo).__name__ == 'DQN':
@@ -327,16 +348,19 @@ class buildinggym_env():
                 obs.insert(0, 'day_of_week', t.weekday())
                 obs.insert(1, 'Working time', self.label_working_time_i(t))            
                 obs.insert(obs.columns.get_loc("t_in") + 1, 'Thermostat', self.com)
-                reward_i, result_i, baseline_i = self.cal_r_i(cooling_energy, t, signal)
-                obs['cooling_energy'] = cooling_energy
-                obs['results'] = result_i
-                obs['rewards'] = reward_i
-                obs['baseline'] = baseline_i
-                obs['Signal'] = signal
-                obs['Target'] = 20000 * (1-0.3*signal)            
-                obs.insert(obs.columns.get_loc("t_in") + 1, 'actions', actions.cpu().item())
-                # obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().item())
-                # obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value.cpu().item())
+                reward_output = self.cal_r_i(obs, state, t)
+                reward_i = reward_output['rewards']
+                for _, (k, v) in enumerate(reward_output.items()):
+                    obs[k] = v                
+                # obs['cooling_energy'] = cooling_energy
+                # obs['results'] = result_i
+                # obs['rewards'] = reward_i
+                # obs['baseline'] = baseline_i
+                # obs['Signal'] = signal
+                # obs['Target'] = 20000 * (1-0.3*signal)            
+                obs.insert(obs.columns.get_loc("rewards") + 1, 'actions', actions.cpu().item())
+                # obs.insert(obs.columns.get_loc("rewards") + 1, 'logprobs', logprob.cpu().item())
+                # obs.insert(obs.columns.get_loc("rewards") + 1, 'values', value.cpu().item())
 
 
                 if self.sensor_index == 0:
@@ -359,9 +383,9 @@ class buildinggym_env():
                 actions = actions.cpu().item()
                 # com = 25. + actions * 2
                 # act = thinenv.act({'Thermostat': self.com})
-                self.env.action.value = {
-                'Thermostat': self.com,
-                }                
+                # self.env.action.value = {
+                # 'Thermostat': self.com,
+                # }                
                 # act = thinenv.act({'Thermostat': 26.2})
 
                 b  = self.args.outlook_steps + 1
@@ -418,21 +442,26 @@ class buildinggym_env():
         # asyncio.run(energyplus_running(self.simulator, self.idf_file, self.epw_file))
         self.world.start().wait()
 
+    @abstractmethod
+    def control_fun(self, actions):
+        pass
+    
+    @abstractmethod
+    def cal_r_i(self, obs, state, time):
+        pass
 
-
-
-    def normalize_input_i(self, state):
-        # nor_min = np.array([22.8, 22, 0, 0, 0])
-        if self.ext_obs_bool:
-            nor_mean = np.array([29.3, 25, 0.78, 0.58, 0.89, 0])
-            std = np.array([2, 2, 0.39, 0.26, 0.26, 1])
-        else:
-            nor_mean = np.array([29.3, 25, 0.78, 0.58, 0.89])
-            std = np.array([2, 2, 0.39, 0.26, 0.26])
-        # nor_min = np.array([0, 0, 0, 0, 0])
-        # nor_max = np.array([33.3, 27, 1, 1, 1])
-        # nor_max = np.array([1, 1, 1, 1, 1])
-        return (state- nor_mean)/std
+    # def normalize_input_i(self, state):
+    #     # nor_min = np.array([22.8, 22, 0, 0, 0])
+    #     if self.ext_obs_bool:
+    #         nor_mean = np.array([29.3, 25, 0.78, 0.58, 0.89, 0])
+    #         std = np.array([2, 2, 0.39, 0.26, 0.26, 1])
+    #     else:
+    #         nor_mean = np.array([29.3, 25, 0.78, 0.58, 0.89])
+    #         std = np.array([2, 2, 0.39, 0.26, 0.26])
+    #     # nor_min = np.array([0, 0, 0, 0, 0])
+    #     # nor_max = np.array([33.3, 27, 1, 1, 1])
+    #     # nor_max = np.array([1, 1, 1, 1, 1])
+    #     return (state- nor_mean)/std
 
     def label_working_time_i(self, t):
         start = pd.to_datetime(self.args.work_time_start, format='%H:%M')
@@ -483,32 +512,32 @@ class buildinggym_env():
     #     self.sensor_dic['rewards'] = reward
     #     self.sensor_dic['results'] = result
 
-    def cal_r_i(self, data, time, signal):
-        # baseline = pd.read_csv('Data\Day_mean.csv')
-        hour = time.hour
-        min = time.minute
-        idx = int(hour*6+int(min/10))
-        # baseline_i = self.baseline['Day_mean'].iloc[idx]
-        baseline_i = 20000
-        # reward_i = max(round(0.3 - abs(data ** 2 - baseline_i ** 2)/baseline_i ** 2,2),-0.4)*5
-        # result_i = round(1 - abs(data - baseline_i)/baseline_i,2)
-        # return reward_i, result_i, baseline_i
-        # baseline_energy = self.baseline['cooling_energy'].iloc[idx]
-        actual_reduction = (baseline_i - data) / baseline_i
+    # def cal_r_i(self, data, time, signal):
+    #     # baseline = pd.read_csv('Data\Day_mean.csv')
+    #     hour = time.hour
+    #     min = time.minute
+    #     idx = int(hour*6+int(min/10))
+    #     # baseline_i = self.baseline['Day_mean'].iloc[idx]
+    #     baseline_i = 20000
+    #     # reward_i = max(round(0.3 - abs(data ** 2 - baseline_i ** 2)/baseline_i ** 2,2),-0.4)*5
+    #     # result_i = round(1 - abs(data - baseline_i)/baseline_i,2)
+    #     # return reward_i, result_i, baseline_i
+    #     # baseline_energy = self.baseline['cooling_energy'].iloc[idx]
+    #     actual_reduction = (baseline_i - data) / baseline_i
         
-        # Target reduction percentage
-        target_reduction = 0.3 * signal
+    #     # Target reduction percentage
+    #     target_reduction = 0.3 * signal
         
-        # if abs(actual_reduction-target_reduction) < 0.05:
-        #     energy_reward = 5
-        # elif abs(actual_reduction-target_reduction) < 0.15:
-        #     energy_reward = 2
-        # else:
-        #     energy_reward = -1
-        energy_reward = 10 - abs(actual_reduction - target_reduction) * 10
-        # if energy_reward<-5:
-        #     energy_reward = -5
-        return energy_reward, actual_reduction, baseline_i
+    #     # if abs(actual_reduction-target_reduction) < 0.05:
+    #     #     energy_reward = 5
+    #     # elif abs(actual_reduction-target_reduction) < 0.15:
+    #     #     energy_reward = 2
+    #     # else:
+    #     #     energy_reward = -1
+    #     energy_reward = 10 - abs(actual_reduction - target_reduction) * 10
+    #     # if energy_reward<-5:
+    #     #     energy_reward = -5
+    #     return energy_reward, actual_reduction, baseline_i
         
     
     def cal_return(self, reward_list):
@@ -517,21 +546,21 @@ class buildinggym_env():
             R = r + R * self.args.gamma
         return R
     
-    def get_ext_var(self, t=None):
-        ext_obs_var = {}
-        if t.hour >=11 and t.hour<=13:
-            for i in self.ext_obs_var:
-                ext_obs_var[i] = random.choice([1])
-        elif t.hour >=14 and t.hour<=16:
-            for i in self.ext_obs_var:
-                ext_obs_var[i] = random.choice([0.5])     
-        elif t.hour >=17 and t.hour<=19:
-            for i in self.ext_obs_var:
-                ext_obs_var[i] = random.choice([1])                    
-        else:
-            for i in self.ext_obs_var:
-                ext_obs_var[i] = random.choice([0])                        
-        return ext_obs_var
+    # def get_ext_var(self, t=None):
+    #     ext_obs_var = {}
+    #     if t.hour >=11 and t.hour<=13:
+    #         for i in self.ext_obs_var:
+    #             ext_obs_var[i] = random.choice([1])
+    #     elif t.hour >=14 and t.hour<=16:
+    #         for i in self.ext_obs_var:
+    #             ext_obs_var[i] = random.choice([0.5])     
+    #     elif t.hour >=17 and t.hour<=19:
+    #         for i in self.ext_obs_var:
+    #             ext_obs_var[i] = random.choice([1])                    
+    #     else:
+    #         for i in self.ext_obs_var:
+    #             ext_obs_var[i] = random.choice([0])                        
+    #     return ext_obs_var
 
     # def handler(self, __event):
     #     global thinenv

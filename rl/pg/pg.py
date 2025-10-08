@@ -12,7 +12,7 @@ from stable_baselines3.common.utils import explained_variance
 from env.env import buildinggym_env
 import numpy as np
 import wandb
-from rl.pg.network import Agent
+from rl.pg.network import policy_network
 
 # SelfA2C = TypeVar("SelfA2C", bound="A2C")
 
@@ -69,7 +69,7 @@ class pg(OnPolicyAlgorithm):
 
     def __init__(
         self,
-        policy: Union[str, Type[Agent]],
+        policy: Union[str, Type[policy_network]],
         env: buildinggym_env,
         args: Type[Args],
         run_name: str,
