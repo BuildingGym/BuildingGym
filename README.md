@@ -11,6 +11,7 @@
 <p align="center">
 <img src="docs\README_images\cover_paper.png" width="38%" >
 </p>
+
 ## Introduction
 🔥 BuildingGym is a project that provides an API to easily train reinforcement learning control algorithm for all EnergyPlus environment, and includes implementations of common reinforcement learning algorithm: Policy gradient, DQN, A2C, A3C, and more. Below is the structure for ```BuildingGym```
 
