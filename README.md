@@ -7,7 +7,7 @@
 > We keep updating our project🚀.
 > If you like this project, consider giving it a **star** 🌟 and clicking **watch** 👀 to keep up with the latest updates and improvements. Your support means a lot!
 
-
+> 🎉 **News:** Our paper, "[BuildingGym: An open-source toolbox for AI-based building energy management using reinforcement learning](https://link.springer.com/article/10.1007/s12273-025-1306-y)", has been recognized as an **ESI Highly Cited Paper** and selected as the **Cover Article** in *Building Simulation*.
 
 ## Introduction
 🔥 BuildingGym is a project that provides an API to easily train reinforcement learning control algorithm for all EnergyPlus environment, and includes implementations of common reinforcement learning algorithm: Policy gradient, DQN, A2C, A3C, and more. Below is the structure for ```BuildingGym```
